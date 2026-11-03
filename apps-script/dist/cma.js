@@ -96,7 +96,7 @@ function link_(params) {
 }
 
 function verify_(e) {
-  var p = e.parameter || {}, keys = Object.keys(p).filter(function (k) { return k !== 's'; });
+  var p = e.parameter || {}, keys = Object.keys(p).filter(function (k) { return k !== 's' && k !== 'format'; });
   var order = (e.queryString || '').split('&').map(function (kv) { return kv.split('=')[0]; }).filter(function (k) { return keys.indexOf(k) >= 0; });
   var q = order.map(function (k) { return k + '=' + encodeURIComponent(p[k]); }).join('&');
   return p.s && p.s === sign_(q);

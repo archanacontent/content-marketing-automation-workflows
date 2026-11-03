@@ -116,6 +116,8 @@ assert.strictEqual(confirmMails.length, 5, 'five confirmation emails');
 assert.ok(linksIn(confirmMails[0].htmlBody)[0].startsWith('https://archanacontent.github.io/content-marketing-automation-workflows/go/?a=confirm'), 'links use pages_url');
 // JSON mode used by the public pages
 const j = C.doGet(Object.assign(qs(linksIn(confirmMails[0].htmlBody)[0].replace(/s=[^&]+$/, 's=bad')), {}));
+// A public-page request adds format=json after the signature and must still verify
+{ const l = linksIn(confirmMails[1].htmlBody)[0] + '&format=json'; const r = C.doGet(qs(l)); assert.ok(r.json && r.json.title === 'You Are In', 'signed link verifies with format=json'); }
 // Tampered link is rejected
 const good = linksIn(confirmMails[0].htmlBody)[0];
 assert.ok(/Link Expired/.test(C.doGet(qs(good.replace(/s=[^&]+$/, 's=bad'))).html), 'bad signature rejected');
