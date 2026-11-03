@@ -98,12 +98,24 @@ function gemini_(prompt, opts) {
   opts = opts || {};
   var key = secret_('GEMINI_API_KEY');
   if (!key) throw new Error('Gemini key not set. Use Automation > Set Gemini key in the control sheet.');
-  var model = setting_('gemini_model') || 'gemini-flash-latest';
+  var models = [setting_('gemini_model') || 'gemini-flash-latest', 'gemini-flash-lite-latest'];
   var body = { contents: [{ role: 'user', parts: [{ text: prompt }] }], generationConfig: { temperature: opts.temperature === undefined ? 0.4 : opts.temperature } };
   if (opts.json) body.generationConfig.responseMimeType = 'application/json';
-  var data = fetchJson_('https://generativelanguage.googleapis.com/v1beta/models/' + model + ':generateContent', {
-    method: 'post', contentType: 'application/json', payload: JSON.stringify(body), headers: { 'x-goog-api-key': key }
-  });
+  /* Busy or rate-limited responses (429, 500, 503) are retried with a pause, then the lighter model is tried. */
+  var data = null, last = '';
+  for (var m = 0; m < models.length && !data; m++) {
+    for (var attempt = 0; attempt < 3 && !data; attempt++) {
+      var res = UrlFetchApp.fetch('https://generativelanguage.googleapis.com/v1beta/models/' + models[m] + ':generateContent', {
+        method: 'post', contentType: 'application/json', payload: JSON.stringify(body), headers: { 'x-goog-api-key': key }, muteHttpExceptions: true
+      });
+      var code = res.getResponseCode();
+      if (code < 300) { data = JSON.parse(res.getContentText()); break; }
+      last = 'HTTP ' + code + ' from ' + models[m] + ': ' + res.getContentText().slice(0, 200);
+      if ([429, 500, 503].indexOf(code) < 0) throw new Error(last);
+      Utilities.sleep(2000 * (attempt + 1));
+    }
+  }
+  if (!data) throw new Error('Gemini is busy. Try again in a few minutes. ' + last);
   var text = (((data.candidates || [])[0] || {}).content || { parts: [] }).parts.map(function (p) { return p.text || ''; }).join('');
   return opts.json ? JSON.parse(text) : text;
 }

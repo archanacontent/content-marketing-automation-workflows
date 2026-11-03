@@ -36,7 +36,7 @@ const props = {};
 global.PropertiesService = { getScriptProperties: () => ({ getProperty: k => props[k] || null, setProperty: (k, v) => { props[k] = v; } }) };
 global.CacheService = { getScriptCache: () => ({ get: () => null, getAll: () => ({}), putAll() {}, removeAll() {} }) };
 global.Utilities = {
-  getUuid: () => crypto.randomUUID(),
+  getUuid: () => crypto.randomUUID(), sleep: () => {},
   computeHmacSha256Signature: (t, k) => [...crypto.createHmac('sha256', k).update(t).digest()],
   base64EncodeWebSafe: b => Buffer.from(b).toString('base64url'),
   base64Encode: b => Buffer.from(b).toString('base64'),
