@@ -215,6 +215,17 @@ assert.ok(tabRows('Claims').length > 0, 'claims extracted');
 global.__prompt = '18'; C.runNow();
 assert.ok(sent.some(m => /Monthly Content Health/.test(m.subject)), 'health check sent');
 
+// Test journey on a fresh set of test subscribers
+book.sheets.Subscribers.data = [book.sheets.Subscribers.data[0]];
+setSetting('test_mode', 'TRUE');
+C.addTestSubscribers();
+sent.filter(m => /Confirm Your Sign-Up/.test(m.subject)).slice(-5).forEach(m => C.doGet(qs(linksIn(m.htmlBody)[0])));
+global.__prompt = 't'; C.runNow();
+const subsT = tabRows('Subscribers');
+assert.ok(subsT.every(s => s['Course step'] === 6), 'all finished: ' + subsT.map(s => s['Course step']));
+assert.strictEqual(subsT.find(s => s.Email.includes('+positioning')).Interest, 'positioning');
+assert.strictEqual(subsT.find(s => s.Email.includes('+sales')).Interest, 'sales');
+assert.ok(sent.some(m => m.to.includes('+silent') && /Keep Coming/.test(m.subject) && Date.now()), 'silent re-engaged');
 const errors = tabRows('Log').filter(l => l.Event === 'error');
 assert.strictEqual(errors.length, 0, 'no errors: ' + JSON.stringify(errors));
 console.log('ALL TESTS PASSED.', sent.length, 'emails sent in the simulation.');

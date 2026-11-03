@@ -87,7 +87,8 @@ var MANUAL = {
   '17': ['Email performance report', function () { return emailReport_(); }],
   '18': ['Monthly content health', function () { return monthlyHealth_(); }],
   '19': ['Course post-mortem', function () { return coursePostMortem_(true); }],
-  'q': ['Send approved items in the queue', function () { return sendApproved_(); }]
+  'q': ['Send approved items in the queue', function () { return sendApproved_(); }],
+  't': ['Test journey: run the whole course for the test subscribers', function () { return testJourney_(); }]
 };
 
 function runNow() {

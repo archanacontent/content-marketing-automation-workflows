@@ -140,17 +140,46 @@ function sendCourseDue_(force) {
 
 function click_(p) {
   var s = sub_(p.id), url = p.u || PLAYBOOK;
-  if (s) {
-    var scores = {};
-    try { scores = JSON.parse(s.Scores || '{}'); } catch (err) { scores = {}; }
-    if (p.t) scores[p.t] = (scores[p.t] || 0) + 1;
-    var top = Object.keys(scores).sort(function (a, b) { return scores[b] - scores[a]; })[0] || '';
-    update_('Subscribers', s._row, { Clicks: Number(s.Clicks || 0) + 1, 'Last click': new Date(), Scores: JSON.stringify(scores), Interest: top });
-    append_('Events', { Time: new Date(), 'Subscriber ID': s.ID, Email: s.Email, Type: 'click', Campaign: String(p.m || '').indexOf('lesson') === 0 ? 'course' : p.m, Message: p.m, Link: url, Detail: p.t || '' });
-  }
+  if (s) recordClick_(s, p, p.t || '');
   var safe = /^https:\/\//.test(url) ? url : PLAYBOOK;
   if (JSON_MODE) return ContentService.createTextOutput(JSON.stringify({ redirect: safe })).setMimeType(ContentService.MimeType.JSON);
   return HtmlService.createHtmlOutput('<script>window.top.location.replace(' + JSON.stringify(safe) + ');</script><p style="font-family:Arial">Opening <a href="' + esc_(safe) + '" target="_top">' + esc_(safe) + '</a></p>');
+}
+
+function recordClick_(s, p, detail) {
+  var scores = {};
+  try { scores = JSON.parse(s.Scores || '{}'); } catch (err) { scores = {}; }
+  if (p.t) scores[p.t] = (scores[p.t] || 0) + 1;
+  /* Ties go to the topic clicked most recently. */
+  var top = Object.keys(scores).sort(function (a, b) { return scores[b] - scores[a] || (b === p.t) - (a === p.t); })[0] || '';
+  update_('Subscribers', s._row, { Clicks: Number(s.Clicks || 0) + 1, 'Last click': new Date(), Scores: JSON.stringify(scores), Interest: top });
+  append_('Events', { Time: new Date(), 'Subscriber ID': s.ID, Email: s.Email, Type: 'click', Campaign: String(p.m || '').indexOf('lesson') === 0 ? 'course' : p.m, Message: p.m, Link: p.u || '', Detail: detail });
+}
+
+/* ---------- Test journey: runs the whole course for the test subscribers in one go ----------
+   Real emails go to the test inboxes. Clicks are simulated from each test persona
+   (the part after + in the address) and logged as "simulated test click". */
+function testJourney_() {
+  var tests = function () { return rows_('Subscribers').filter(function (s) { return isTrue_(s['Is test']) && s.Status === 'active'; }); };
+  var persona = function (s) { var m = String(s.Email).match(/\+([a-z]+)@/); return m ? m[1] : ''; };
+  for (var round = 0; round < 6; round++) {
+    var before = tests().map(function (s) { return s.ID + ':' + s['Course step']; }).join(',');
+    tests().forEach(function (s) {
+      var step = Number(s['Course step'] || 0);
+      if (step >= 1 && step < 5) sendLesson_(s, step + 1);
+      else if (step === 5) sendNextBest_(s);
+    });
+    tests().forEach(function (s) {
+      var step = Number(s['Course step'] || 0), who = persona(s);
+      if (step < 2 || step > 5 || who === 'silent') return;
+      COURSE[step - 1].links.forEach(function (l) {
+        if (l.topic === who) recordClick_(sub_(s.ID), { m: COURSE[step - 1].id, t: l.topic, u: l.url }, 'simulated test click');
+      });
+    });
+    if (tests().map(function (s) { return s.ID + ':' + s['Course step']; }).join(',') === before) break;
+  }
+  var re = reengage_();
+  return 'Course, next-best emails and re-engagement sent to test subscribers. ' + re;
 }
 
 /* ---------- Workflow 10: next-best email ---------- */
