@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>One Moment</title><meta name="robots" content="noindex">
+<link rel="stylesheet" href="../assets/page.css"></head>
+<body><main><a class="brand" href="https://archanacontent.github.io/">ARCHANA PANDA</a><div class="spin" role="status" aria-label="Loading"></div></main>
+<script src="../assets/config.js"></script><script src="../assets/cma.js"></script>
+<script>
+(function () {
+  var q = location.search.slice(1), params = new URLSearchParams(q);
+  if (params.get('a') === 'c') {
+    var target = params.get('u') || '', host = '';
+    try { host = new URL(target).host; } catch (e) {}
+    var dest = window.CMA_ALLOWED_HOSTS.indexOf(host) >= 0 ? target : 'https://archanacontent.github.io/b2b-saas/';
+    var go = function () { location.replace(dest); };
+    cmaCall(q).then(go, go);
+    setTimeout(go, 2500);
+    return;
+  }
+  cmaCall(q).then(function (r) {
+    cmaShow(r.title || 'Done', r.text || '', r.title === 'You Are In' ? { text: 'Open The Playbook', href: 'https://archanacontent.github.io/b2b-saas/' } : null);
+  }, function () {
+    cmaShow('Something Went Wrong', 'The request did not go through. Check your connection and open the link again.');
+  });
+})();
+</script></body></html>

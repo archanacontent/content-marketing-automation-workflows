@@ -2,8 +2,14 @@
 
 /* ---------- Web app router ---------- */
 
+/* Requests from the public pages on GitHub Pages ask for JSON (format=json).
+   Those pages call the web app without Google sign-in cookies, so visitors signed in
+   to several Google accounts never hit Google's "unable to open the file" error. */
+var JSON_MODE = false;
+
 function doGet(e) {
   var p = (e && e.parameter) || {};
+  JSON_MODE = p.format === 'json';
   var a = p.a || 'signup';
   if (a === 'signup') return page_('Launch A B2B SaaS Product In Five Emails', signupForm_(p.src || 'direct'));
   if (a === 'enquiry') return page_('Work With Archana', enquiryForm_());
@@ -17,6 +23,7 @@ function doGet(e) {
 
 function doPost(e) {
   var p = (e && e.parameter) || {};
+  JSON_MODE = p.format === 'json';
   if (p.website) return page_('Thanks', '<p>Thanks.</p>');
   if (p.form === 'signup') return signup_(p);
   if (p.form === 'enquiry') return enquiry_(p);
@@ -24,6 +31,10 @@ function doPost(e) {
 }
 
 function page_(title, inner) {
+  if (JSON_MODE) {
+    var text = String(inner).replace(/<form[\s\S]*<\/form>/, '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+    return ContentService.createTextOutput(JSON.stringify({ title: title, text: text })).setMimeType(ContentService.MimeType.JSON);
+  }
   var html = '<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><title>' + esc_(title) + '</title>' +
     '<style>body{margin:0;background:#131416;color:#EFEBE3;font:16px/1.6 Inter,Arial,sans-serif}main{max-width:520px;margin:0 auto;padding:40px 18px}' +
     'h1{font:700 28px/1.2 Arial,sans-serif;margin:0 0 14px}p{color:rgba(239,235,227,.78)}label{display:block;margin:16px 0 6px;font-weight:600}' +
@@ -138,6 +149,7 @@ function click_(p) {
     append_('Events', { Time: new Date(), 'Subscriber ID': s.ID, Email: s.Email, Type: 'click', Campaign: String(p.m || '').indexOf('lesson') === 0 ? 'course' : p.m, Message: p.m, Link: url, Detail: p.t || '' });
   }
   var safe = /^https:\/\//.test(url) ? url : PLAYBOOK;
+  if (JSON_MODE) return ContentService.createTextOutput(JSON.stringify({ redirect: safe })).setMimeType(ContentService.MimeType.JSON);
   return HtmlService.createHtmlOutput('<script>window.top.location.replace(' + JSON.stringify(safe) + ');</script><p style="font-family:Arial">Opening <a href="' + esc_(safe) + '" target="_top">' + esc_(safe) + '</a></p>');
 }
 

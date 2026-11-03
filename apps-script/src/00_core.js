@@ -17,7 +17,8 @@ var DEFAULT_SETTINGS = [
   ['sender_name', 'Archana Panda', 'Display name on outgoing email'],
   ['postal_address', '[Postal address required before sending to real subscribers]', 'CAN-SPAM requires a real postal address in marketing email footers'],
   ['ga4_property_id', '', 'Google Analytics 4 property ID (numbers only)'],
-  ['webapp_url', '', 'Web app URL from Deploy > Manage deployments (ends in /exec). Every email link uses it.'],
+  ['webapp_url', '', 'Web app URL from Deploy > Manage deployments (ends in /exec).'],
+  ['pages_url', 'https://archanacontent.github.io/content-marketing-automation-workflows/', 'Public pages on GitHub Pages. Email links open these pages, which then call the web app.'],
   ['site_url', 'https://archanacontent.github.io/', 'Portfolio home page'],
   ['github_owner', 'archanacontent', 'GitHub account that holds the guides'],
   ['guide_repos', 'nvd-cve-api-docs,medicaid-2027-implementation-guide,medically-frail-guide,openfda-drug-safety-guide,b2b-saas', 'Repositories checked by the content workflows'],
@@ -88,7 +89,8 @@ function appUrl_() { return setting_('webapp_url') || ScriptApp.getService().get
 
 function link_(params) {
   var q = Object.keys(params).map(function (k) { return k + '=' + encodeURIComponent(params[k]); }).join('&');
-  return appUrl_() + '?' + q + '&s=' + sign_(q);
+  var base = setting_('pages_url') ? setting_('pages_url').replace(/\/?$/, '/') + 'go/' : appUrl_();
+  return base + '?' + q + '&s=' + sign_(q);
 }
 
 function verify_(e) {

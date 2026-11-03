@@ -53,6 +53,7 @@ global.ScriptApp = {
   newTrigger: n => ({ timeBased() { return this; }, everyHours() { return this; }, atHour() { return this; }, everyDays() { return this; }, onWeekDay() { return this; }, create() { triggers.push(n); } }),
   WeekDay: { MONDAY: 1 }, getOAuthToken: () => 'tok'
 };
+global.ContentService = { MimeType: { JSON: 'json' }, createTextOutput: t => ({ json: JSON.parse(t), setMimeType() { return this; } }) };
 global.HtmlService = { createHtmlOutput: h => ({ html: h, setTitle() { return this; }, addMetaTag() { return this; } }) };
 const routes = [];
 function respond(code, body, headers) { return { getResponseCode: () => code, getContentText: () => body, getHeaders: () => headers || { 'Content-Type': 'text/html' } }; }
@@ -94,7 +95,7 @@ routes.push([/dead\.example/, () => respond(404, '')]);
 (0, eval)(fs.readFileSync(path.join(__dirname, '../apps-script/dist/cma.js'), 'utf8'));
 const C = global.CMA;
 const qs = u => { const q = u.split('?')[1]; const p = {}; q.split('&').forEach(kv => { const [k, v] = kv.split('='); p[k] = decodeURIComponent(v); }); return { parameter: p, queryString: q }; };
-const linksIn = html => [...html.matchAll(/href="([^"]+)"/g)].map(m => m[1].replace(/&amp;/g, '&')).filter(u => u.startsWith(WEBAPP));
+const linksIn = html => [...html.matchAll(/href="([^"]+)"/g)].map(m => m[1].replace(/&amp;/g, '&')).filter(u => u.startsWith(WEBAPP) || u.includes('/go/?'));
 const tabRows = n => { const d = book.sheets[n].data; const h = d[0]; return d.slice(1).map(r => Object.fromEntries(h.map((k, i) => [k, r[i]]))); };
 const setSetting = (k, v) => { const d = book.sheets.Settings.data; d.find(r => r[0] === k)[1] = v; };
 
@@ -111,6 +112,10 @@ assert.strictEqual(tabRows('Subscribers').length, 5);
 const confirmMails = sent.filter(m => /Confirm Your Sign-Up/.test(m.subject));
 assert.strictEqual(confirmMails.length, 5, 'five confirmation emails');
 
+// Links open the public GitHub Pages link page
+assert.ok(linksIn(confirmMails[0].htmlBody)[0].startsWith('https://archanacontent.github.io/content-marketing-automation-workflows/go/?a=confirm'), 'links use pages_url');
+// JSON mode used by the public pages
+const j = C.doGet(Object.assign(qs(linksIn(confirmMails[0].htmlBody)[0].replace(/s=[^&]+$/, 's=bad')), {}));
 // Tampered link is rejected
 const good = linksIn(confirmMails[0].htmlBody)[0];
 assert.ok(/Link Expired/.test(C.doGet(qs(good.replace(/s=[^&]+$/, 's=bad'))).html), 'bad signature rejected');
@@ -169,7 +174,8 @@ C.runHourly();
 assert.ok(sent.some(m => /Enquiry Waiting/.test(m.subject)), 'reminder sent');
 
 // Sign-up from a stranger in test mode: confirmation goes, lessons do not
-C.doPost({ parameter: { form: 'signup', name: 'Real', email: 'someone@other.com', consent: 'yes', src: 'portfolio' } });
+const pj = C.doPost({ parameter: { form: 'signup', name: 'Real', email: 'someone@other.com', consent: 'yes', src: 'portfolio', format: 'json' } });
+assert.strictEqual(pj.json.title, 'Check Your Inbox', 'JSON response for public pages');
 const stranger = sent.filter(m => m.to === 'someone@other.com');
 assert.strictEqual(stranger.length, 1);
 C.doGet(qs(linksIn(stranger[0].htmlBody)[0]));

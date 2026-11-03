@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Work With Archana</title>
+<meta name="description" content="Send a project or role enquiry to Archana Panda, Senior Technical Writer and B2B content marketer.">
+<link rel="stylesheet" href="../assets/page.css"></head>
+<body><main>
+<a class="brand" href="https://archanacontent.github.io/">ARCHANA PANDA</a>
+<h1>Work With Archana</h1>
+<p>Tell me what you need. You will get a reply with relevant work samples straight away, and a personal reply from me after that.</p>
+<form id="f">
+<input type="hidden" name="form" value="enquiry">
+<input class="hp" name="website" tabindex="-1" autocomplete="off" aria-hidden="true">
+<label for="n">Name</label><input id="n" name="name" required maxlength="80" autocomplete="name">
+<label for="e">Email</label><input id="e" name="email" type="email" required maxlength="120" autocomplete="email">
+<label for="c">Company</label><input id="c" name="company" maxlength="120" autocomplete="organization">
+<label for="m">What Do You Need?</label><textarea id="m" name="message" rows="6" required maxlength="3000"></textarea>
+<button type="submit">Send Message</button>
+</form>
+</main>
+<script src="../assets/config.js"></script><script src="../assets/cma.js"></script>
+<script>
+document.getElementById('f').addEventListener('submit', function (ev) {
+  ev.preventDefault();
+  var b = this.querySelector('button'); b.disabled = true; b.textContent = 'Sending';
+  cmaPost(this).then(function (r) { cmaShow(r.title, r.text); }, function () { cmaShow('Something Went Wrong', 'The message did not go through. Check your connection and try again.'); });
+});
+</script></body></html>

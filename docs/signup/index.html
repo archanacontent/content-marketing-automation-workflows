@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Launch A B2B SaaS Product In Five Emails</title>
+<meta name="description" content="A five-lesson email course on launching a B2B SaaS product, from proving demand to the 90-day review.">
+<link rel="stylesheet" href="../assets/page.css"></head>
+<body><main>
+<a class="brand" href="https://archanacontent.github.io/">ARCHANA PANDA</a>
+<h1>Launch A B2B SaaS Product In Five Emails</h1>
+<p>Most B2B SaaS launches stall on gaps nobody planned for. The course walks through each stage, from proving demand to the 90-day review, in five short lessons sent every two days.</p>
+<form id="f">
+<input type="hidden" name="form" value="signup"><input type="hidden" name="src" id="src" value="direct">
+<input class="hp" name="website" tabindex="-1" autocomplete="off" aria-hidden="true">
+<label for="n">First Name</label><input id="n" name="name" required maxlength="60" autocomplete="given-name">
+<label for="e">Work Email</label><input id="e" name="email" type="email" required maxlength="120" autocomplete="email">
+<label class="chk"><input type="checkbox" name="consent" value="yes" required> I agree to receive the course and occasional updates. I can unsubscribe at any time.</label>
+<button type="submit">Start The Course</button>
+</form>
+</main>
+<script src="../assets/config.js"></script><script src="../assets/cma.js"></script>
+<script>
+document.getElementById('src').value = new URLSearchParams(location.search).get('src') || 'direct';
+document.getElementById('f').addEventListener('submit', function (ev) {
+  ev.preventDefault();
+  var b = this.querySelector('button'); b.disabled = true; b.textContent = 'Sending';
+  cmaPost(this).then(function (r) { cmaShow(r.title, r.text); }, function () { cmaShow('Something Went Wrong', 'The sign-up did not go through. Check your connection and try again.'); });
+});
+</script></body></html>
