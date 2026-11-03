@@ -19,6 +19,7 @@ var DEFAULT_SETTINGS = [
   ['sender_name', 'Archana Panda', 'Display name on outgoing email'],
   ['postal_address', '[Postal address required before sending to real subscribers]', 'CAN-SPAM requires a real postal address in marketing email footers'],
   ['ga4_property_id', '', 'Google Analytics 4 property ID (numbers only)'],
+  ['webapp_url', '', 'Web app URL from Deploy > Manage deployments (ends in /exec). Every email link uses it.'],
   ['site_url', 'https://archanacontent.github.io/', 'Portfolio home page'],
   ['github_owner', 'archanacontent', 'GitHub account that holds the guides'],
   ['guide_repos', 'nvd-cve-api-docs,medicaid-2027-implementation-guide,medically-frail-guide,openfda-drug-safety-guide,b2b-saas', 'Repositories checked by the content workflows'],
@@ -85,7 +86,7 @@ function sign_(text) {
   return Utilities.base64EncodeWebSafe(raw).slice(0, 16);
 }
 
-function appUrl_() { return ScriptApp.getService().getUrl() || ''; }
+function appUrl_() { return setting_('webapp_url') || ScriptApp.getService().getUrl() || ''; }
 
 function link_(params) {
   var q = Object.keys(params).map(function (k) { return k + '=' + encodeURIComponent(params[k]); }).join('&');
@@ -796,7 +797,7 @@ function addTestSubscribers() {
     append_('Subscribers', { ID: uid_('s'), Email: email, Name: 'Test ' + n[1], Source: 'test', Status: 'pending', Consent: 'Owner test address', 'Signed up': new Date(), 'Course step': 0, Clicks: 0, Scores: '{}', 'Is test': true });
   });
   rows_('Subscribers').filter(function (r) { return isTrue_(r['Is test']) && r.Status === 'pending'; }).forEach(function (r) { sendConfirmation_(r.ID, false); });
-  SpreadsheetApp.getUi().alert('Five test subscribers added and confirmation emails sent. Open each one and tap Confirm my email.');
+  SpreadsheetApp.getUi().alert('Five test subscribers added and confirmation emails sent. Open each one and tap Confirm My Email.');
 }
 
 /* Content operations: workflows 1 to 5. */
