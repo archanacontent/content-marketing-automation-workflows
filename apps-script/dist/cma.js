@@ -941,14 +941,22 @@ function readSource_(s) {
   return Utilities.base64Encode(Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_1, page)).slice(0, 12);
 }
 
+/* Sheets turns "2.0" into 2 and "2026-10-28" into a date when it stores them. Values are
+   normalised before comparing and written back as text, so that never reads as a change. */
+function norm_(v) {
+  if (v instanceof Date) return Utilities.formatDate(v, Session.getScriptTimeZone(), 'yyyy-MM-dd');
+  var t = String(v === undefined || v === null ? '' : v).replace(/^'/, '').trim();
+  return /^-?\d+(\.\d+)?$/.test(t) ? String(Number(t)) : t;
+}
+
 function watchSources_() {
   var changes = [];
   rows_('Sources').forEach(function (s) {
     var now;
     try { now = readSource_(s); } catch (err) { update_('Sources', s._row, { 'Last checked': new Date(), Status: 'error: ' + err.message.slice(0, 120) }); return; }
-    var was = String(s['Last value'] || '');
-    var upd = { 'Last checked': new Date(), 'Last value': now, Status: 'ok' };
-    if (was && was !== now) {
+    var was = s['Last value'] === '' || s['Last value'] === undefined ? '' : norm_(s['Last value']);
+    var upd = { 'Last checked': new Date(), 'Last value': "'" + now, Status: 'ok' };
+    if (was && was !== norm_(now)) {
       upd['Last changed'] = new Date(); upd.Status = 'changed';
       changes.push({ name: s.Name, was: was, now: now, guides: s['Guides affected'], url: s.Target });
     }

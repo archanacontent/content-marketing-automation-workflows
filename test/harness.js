@@ -189,6 +189,10 @@ assert.ok(!sent.some(m => m.to === 'someone@other.com' && /Lesson 1/.test(m.subj
 global.__prompt = 'https://archanacontent.github.io/b2b-saas/';
 C.runDaily();
 assert.ok(tabRows('Sources').every(s => s.Status === 'ok'), 'sources read');
+// Sheets coerces stored values: a number or date coming back must not count as a change
+book.sheets.Sources.data.forEach((r, i) => { if (i && r[6] === "'2.0") r[6] = 2; if (i && r[6] === "'2026-10-30") r[6] = new Date('2026-10-30T00:00:00Z'); });
+C.runDaily();
+assert.ok(tabRows('Sources').every(s => s.Status === 'ok'), 'no false change after coercion: ' + tabRows('Sources').map(s => s.Status));
 global.__nvd = 'Analyzed';
 C.runDaily();
 assert.ok(sent.some(m => /Source Change/.test(m.subject)), 'source change alert');
