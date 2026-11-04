@@ -1,6 +1,7 @@
 /* Core: control sheet, settings, logging and small helpers. */
 
 var TABS = {
+  Run: ['No.', 'Workflow', 'Run now', 'Input (URL, if needed)', 'Last run', 'Result'],
   Settings: ['Key', 'Value', 'Notes'],
   Subscribers: ['ID', 'Email', 'Name', 'Source', 'Status', 'Consent', 'Signed up', 'Confirmed', 'Course step', 'Next send', 'Last click', 'Clicks', 'Interest', 'Scores', 'Is test'],
   Events: ['Time', 'Subscriber ID', 'Email', 'Type', 'Campaign', 'Message', 'Link', 'Detail'],
@@ -108,6 +109,9 @@ function fetchJson_(url, opts) {
   if (code >= 300) throw new Error('HTTP ' + code + ' from ' + url + ': ' + res.getContentText().slice(0, 300));
   return JSON.parse(res.getContentText());
 }
+
+/* Alerts only work when a person runs something from the sheet. Elsewhere they are skipped. */
+function alert_(msg) { try { SpreadsheetApp.getUi().alert(msg); } catch (err) { log_('Info', 'message', msg); } }
 
 function hours_(n) { return n * 3600 * 1000; }
 function days_(n) { return n * 24 * 3600 * 1000; }

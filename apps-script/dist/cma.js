@@ -3,6 +3,7 @@
 /* Core: control sheet, settings, logging and small helpers. */
 
 var TABS = {
+  Run: ['No.', 'Workflow', 'Run now', 'Input (URL, if needed)', 'Last run', 'Result'],
   Settings: ['Key', 'Value', 'Notes'],
   Subscribers: ['ID', 'Email', 'Name', 'Source', 'Status', 'Consent', 'Signed up', 'Confirmed', 'Course step', 'Next send', 'Last click', 'Clicks', 'Interest', 'Scores', 'Is test'],
   Events: ['Time', 'Subscriber ID', 'Email', 'Type', 'Campaign', 'Message', 'Link', 'Detail'],
@@ -110,6 +111,9 @@ function fetchJson_(url, opts) {
   if (code >= 300) throw new Error('HTTP ' + code + ' from ' + url + ': ' + res.getContentText().slice(0, 300));
   return JSON.parse(res.getContentText());
 }
+
+/* Alerts only work when a person runs something from the sheet. Elsewhere they are skipped. */
+function alert_(msg) { try { SpreadsheetApp.getUi().alert(msg); } catch (err) { log_('Info', 'message', msg); } }
 
 function hours_(n) { return n * 3600 * 1000; }
 function days_(n) { return n * 24 * 3600 * 1000; }
@@ -272,11 +276,12 @@ function setup() {
   seedSources_();
   seedClaims_();
   ScriptApp.getProjectTriggers().forEach(function (t) { ScriptApp.deleteTrigger(t); });
-  ScriptApp.newTrigger('cmaRunHourly').timeBased().everyHours(1).create();
+  ScriptApp.newTrigger('cmaRunHourly').timeBased().everyMinutes(10).create();
   ScriptApp.newTrigger('cmaRunDaily').timeBased().atHour(7).everyDays(1).create();
   ScriptApp.newTrigger('cmaRunWeekly').timeBased().onWeekDay(ScriptApp.WeekDay.MONDAY).atHour(8).create();
+  fillRunTab_();
   log_('Setup', 'complete', 'Tabs, settings, sources, claims and triggers are in place');
-  SpreadsheetApp.getUi().alert('Setup complete. Next: Automation > Set Gemini key.');
+  alert_('Setup complete.');
 }
 
 function setGeminiKey() {
@@ -293,7 +298,7 @@ function setGeminiKey() {
 }
 
 function refreshed() {
-  SpreadsheetApp.getUi().alert('Latest workflow version loaded from GitHub.');
+  alert_('Latest workflow version loaded from GitHub.');
 }
 
 /* Scheduler. Each job is isolated so one failure never stops the rest. */
@@ -302,6 +307,7 @@ function safe_(name, fn) {
 }
 
 function runHourly() {
+  safe_('Run tab', processRunTab_);
   safe_('Sign-up confirmations', remindUnconfirmed_);
   safe_('Course', sendCourseDue_);
   safe_('Re-engagement and sunset', reengage_);
@@ -327,17 +333,18 @@ var MANUAL = {
   '1': ['Source change watch', function () { return watchSources_(); }],
   '2': ['Claims register and annual versioning', function () { return checkClaims_(true); }],
   '3': ['Publishing QA', function () { return publishingQa_(true); }],
-  '4': ['Metadata and internal links', function () { return metadataSuggest_(); }],
-  '5': ['Distribution drafts', function () { return distributionDrafts_(); }],
+  '4': ['Metadata and internal links', function (input) { return metadataSuggest_(input); }],
+  '5': ['Distribution drafts', function (input) { return distributionDrafts_(input ? contentFromUrl_(input) : null); }],
   '8': ['Course: send due emails', function () { return sendCourseDue_(true); }],
   '11': ['Re-engagement and sunset', function () { return reengage_(); }],
-  '13': ['New content broadcast draft', function () { return broadcastDraft_(); }],
+  '13': ['New content broadcast draft', function (input) { return broadcastDraft_(input ? contentFromUrl_(input) : null); }],
   '15': ['Enquiry reminders', function () { return remindEnquiries_(); }],
   '16': ['Weekly performance report', function () { return weeklyReport_(); }],
   '17': ['Email performance report', function () { return emailReport_(); }],
   '18': ['Monthly content health', function () { return monthlyHealth_(); }],
   '19': ['Course post-mortem', function () { return coursePostMortem_(true); }],
   'q': ['Send approved items in the queue', function () { return sendApproved_(); }],
+  'a': ['Add test subscribers', function () { return addTestSubscribers(); }],
   't': ['Test journey: run the whole course for the test subscribers', function () { return testJourney_(); }]
 };
 
@@ -356,6 +363,36 @@ function runNow() {
     log_(job[0], 'error', err.message);
     ui.alert(job[0] + ' failed: ' + err.message);
   }
+}
+
+/* Run tab: tick "Run now" on any row and the workflow runs within ten minutes, no menu needed. */
+var NEEDS_URL = ['4', '5', '13'];
+
+function fillRunTab_() {
+  var have = rows_('Run').map(function (r) { return String(r['No.']); });
+  Object.keys(MANUAL).forEach(function (k) {
+    if (have.indexOf(k) < 0) append_('Run', { 'No.': k, Workflow: MANUAL[k][0], 'Run now': false, 'Input (URL, if needed)': NEEDS_URL.indexOf(k) >= 0 ? 'Paste a page URL here' : '' });
+  });
+  var sh = tab_('Run');
+  sh.getRange(2, TABS.Run.indexOf('Run now') + 1, Math.max(sh.getLastRow() - 1, 1), 1).insertCheckboxes();
+  sh.setColumnWidth(2, 320);
+}
+
+function processRunTab_() {
+  rows_('Run').forEach(function (r) {
+    if (!isTrue_(r['Run now'])) return;
+    update_('Run', r._row, { 'Run now': false, 'Last run': new Date(), Result: 'Running' });
+    var job = MANUAL[String(r['No.'])], input = String(r['Input (URL, if needed)'] || '');
+    if (!/^https?:\/\//.test(input)) input = '';
+    var out;
+    try {
+      if (!job) throw new Error('Unknown workflow number');
+      if (NEEDS_URL.indexOf(String(r['No.'])) >= 0 && !input) throw new Error('Paste a page URL in the Input column first');
+      out = job[1](input) || 'Done';
+    } catch (err) { out = 'Error: ' + err.message; }
+    update_('Run', r._row, { Result: String(out).slice(0, 500) });
+    log_(job ? job[0] : 'Run tab', 'run from Run tab', out);
+  });
 }
 
 /* Course content for the email journey. Copy lives here so it can be
@@ -841,7 +878,8 @@ function addTestSubscribers() {
     append_('Subscribers', { ID: uid_('s'), Email: email, Name: 'Test ' + n[1], Source: 'test', Status: 'pending', Consent: 'Owner test address', 'Signed up': new Date(), 'Course step': 0, Clicks: 0, Scores: '{}', 'Is test': true });
   });
   rows_('Subscribers').filter(function (r) { return isTrue_(r['Is test']) && r.Status === 'pending'; }).forEach(function (r) { sendConfirmation_(r.ID, false); });
-  SpreadsheetApp.getUi().alert('Five test subscribers added and confirmation emails sent. Open each one and tap Confirm My Email.');
+  alert_('Five test subscribers added and confirmation emails sent. Open each one and tap Confirm My Email.');
+  return 'Five test subscribers added and confirmation emails sent';
 }
 
 /* Content operations: workflows 1 to 5. */

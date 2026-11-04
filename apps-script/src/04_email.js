@@ -355,5 +355,6 @@ function addTestSubscribers() {
     append_('Subscribers', { ID: uid_('s'), Email: email, Name: 'Test ' + n[1], Source: 'test', Status: 'pending', Consent: 'Owner test address', 'Signed up': new Date(), 'Course step': 0, Clicks: 0, Scores: '{}', 'Is test': true });
   });
   rows_('Subscribers').filter(function (r) { return isTrue_(r['Is test']) && r.Status === 'pending'; }).forEach(function (r) { sendConfirmation_(r.ID, false); });
-  SpreadsheetApp.getUi().alert('Five test subscribers added and confirmation emails sent. Open each one and tap Confirm My Email.');
+  alert_('Five test subscribers added and confirmation emails sent. Open each one and tap Confirm My Email.');
+  return 'Five test subscribers added and confirmation emails sent';
 }

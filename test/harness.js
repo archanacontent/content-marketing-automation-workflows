@@ -13,6 +13,7 @@ function Sheet(name) { this.name = name; this.data = []; }
 Sheet.prototype.set = function (r, c, v) { while (this.data.length < r) this.data.push([]); const row = this.data[r - 1]; while (row.length < c) row.push(''); row[c - 1] = v; };
 Sheet.prototype.getRange = function (r, c, nr, nc) { return new Range(this, r, c, nr, nc); };
 Sheet.prototype.setFrozenRows = function () {};
+Sheet.prototype.setColumnWidth = function () {};
 Sheet.prototype.appendRow = function (row) { this.data.push(row.slice()); };
 Sheet.prototype.getLastRow = function () { return this.data.length; };
 Sheet.prototype.getDataRange = function () { const w = Math.max(...this.data.map(r => r.length)); const d = this.data.map(r => { const x = r.slice(); while (x.length < w) x.push(''); return x; }); return { getValues: () => d.map(r => r.slice()) }; };
@@ -50,7 +51,7 @@ const WEBAPP = 'https://script.google.com/macros/s/TEST/exec';
 global.ScriptApp = {
   getService: () => ({ getUrl: () => WEBAPP }),
   getProjectTriggers: () => triggers.slice(), deleteTrigger: t => triggers.splice(triggers.indexOf(t), 1),
-  newTrigger: n => ({ timeBased() { return this; }, everyHours() { return this; }, atHour() { return this; }, everyDays() { return this; }, onWeekDay() { return this; }, create() { triggers.push(n); } }),
+  newTrigger: n => ({ timeBased() { return this; }, everyHours() { return this; }, everyMinutes() { return this; }, atHour() { return this; }, everyDays() { return this; }, onWeekDay() { return this; }, create() { triggers.push(n); } }),
   WeekDay: { MONDAY: 1 }, getOAuthToken: () => 'tok'
 };
 global.ContentService = { MimeType: { JSON: 'json' }, createTextOutput: t => ({ json: JSON.parse(t), setMimeType() { return this; } }) };
@@ -101,7 +102,7 @@ const setSetting = (k, v) => { const d = book.sheets.Settings.data; d.find(r => 
 
 /* ---------- Tests ---------- */
 C.setup();
-assert.deepStrictEqual(Object.keys(book.sheets).sort(), ['Claims', 'Enquiries', 'Events', 'Log', 'Queue', 'Settings', 'Sources', 'Subscribers'].sort());
+assert.deepStrictEqual(Object.keys(book.sheets).sort(), ['Claims', 'Enquiries', 'Events', 'Log', 'Queue', 'Run', 'Settings', 'Sources', 'Subscribers'].sort());
 assert.strictEqual(triggers.length, 3);
 props.GEMINI_API_KEY = 'k';
 setSetting('ga4_property_id', '123');
@@ -226,6 +227,14 @@ assert.ok(subsT.every(s => s['Course step'] === 6), 'all finished: ' + subsT.map
 assert.strictEqual(subsT.find(s => s.Email.includes('+positioning')).Interest, 'positioning');
 assert.strictEqual(subsT.find(s => s.Email.includes('+sales')).Interest, 'sales');
 assert.ok(sent.some(m => m.to.includes('+silent') && /Keep Coming/.test(m.subject) && Date.now()), 'silent re-engaged');
+// Run tab: tick a box and the 10-minute schedule runs it
+const runRows = book.sheets.Run.data; const r11 = runRows.findIndex(r => String(r[0]) === '17'); runRows[r11][2] = true;
+const nBefore = sent.filter(m => /Email Performance/.test(m.subject)).length;
+C.runHourly();
+assert.strictEqual(sent.filter(m => /Email Performance/.test(m.subject)).length, nBefore + 1, 'Run tab ran workflow 17');
+assert.strictEqual(runRows[r11][2], false, 'tick cleared');
+const r4 = runRows.findIndex(r => String(r[0]) === '4'); runRows[r4][2] = true; runRows[r4][3] = 'https://archanacontent.github.io/b2b-saas/'; C.runHourly();
+assert.ok(/Queue/.test(runRows[r4][5]), 'workflow 4 ran with URL input: ' + runRows[r4][5]);
 const errors = tabRows('Log').filter(l => l.Event === 'error');
 assert.strictEqual(errors.length, 0, 'no errors: ' + JSON.stringify(errors));
 console.log('ALL TESTS PASSED.', sent.length, 'emails sent in the simulation.');

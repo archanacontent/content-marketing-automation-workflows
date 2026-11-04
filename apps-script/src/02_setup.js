@@ -22,11 +22,12 @@ function setup() {
   seedSources_();
   seedClaims_();
   ScriptApp.getProjectTriggers().forEach(function (t) { ScriptApp.deleteTrigger(t); });
-  ScriptApp.newTrigger('cmaRunHourly').timeBased().everyHours(1).create();
+  ScriptApp.newTrigger('cmaRunHourly').timeBased().everyMinutes(10).create();
   ScriptApp.newTrigger('cmaRunDaily').timeBased().atHour(7).everyDays(1).create();
   ScriptApp.newTrigger('cmaRunWeekly').timeBased().onWeekDay(ScriptApp.WeekDay.MONDAY).atHour(8).create();
+  fillRunTab_();
   log_('Setup', 'complete', 'Tabs, settings, sources, claims and triggers are in place');
-  SpreadsheetApp.getUi().alert('Setup complete. Next: Automation > Set Gemini key.');
+  alert_('Setup complete.');
 }
 
 function setGeminiKey() {
@@ -43,7 +44,7 @@ function setGeminiKey() {
 }
 
 function refreshed() {
-  SpreadsheetApp.getUi().alert('Latest workflow version loaded from GitHub.');
+  alert_('Latest workflow version loaded from GitHub.');
 }
 
 /* Scheduler. Each job is isolated so one failure never stops the rest. */
@@ -52,6 +53,7 @@ function safe_(name, fn) {
 }
 
 function runHourly() {
+  safe_('Run tab', processRunTab_);
   safe_('Sign-up confirmations', remindUnconfirmed_);
   safe_('Course', sendCourseDue_);
   safe_('Re-engagement and sunset', reengage_);
@@ -77,17 +79,18 @@ var MANUAL = {
   '1': ['Source change watch', function () { return watchSources_(); }],
   '2': ['Claims register and annual versioning', function () { return checkClaims_(true); }],
   '3': ['Publishing QA', function () { return publishingQa_(true); }],
-  '4': ['Metadata and internal links', function () { return metadataSuggest_(); }],
-  '5': ['Distribution drafts', function () { return distributionDrafts_(); }],
+  '4': ['Metadata and internal links', function (input) { return metadataSuggest_(input); }],
+  '5': ['Distribution drafts', function (input) { return distributionDrafts_(input ? contentFromUrl_(input) : null); }],
   '8': ['Course: send due emails', function () { return sendCourseDue_(true); }],
   '11': ['Re-engagement and sunset', function () { return reengage_(); }],
-  '13': ['New content broadcast draft', function () { return broadcastDraft_(); }],
+  '13': ['New content broadcast draft', function (input) { return broadcastDraft_(input ? contentFromUrl_(input) : null); }],
   '15': ['Enquiry reminders', function () { return remindEnquiries_(); }],
   '16': ['Weekly performance report', function () { return weeklyReport_(); }],
   '17': ['Email performance report', function () { return emailReport_(); }],
   '18': ['Monthly content health', function () { return monthlyHealth_(); }],
   '19': ['Course post-mortem', function () { return coursePostMortem_(true); }],
   'q': ['Send approved items in the queue', function () { return sendApproved_(); }],
+  'a': ['Add test subscribers', function () { return addTestSubscribers(); }],
   't': ['Test journey: run the whole course for the test subscribers', function () { return testJourney_(); }]
 };
 
@@ -106,4 +109,34 @@ function runNow() {
     log_(job[0], 'error', err.message);
     ui.alert(job[0] + ' failed: ' + err.message);
   }
+}
+
+/* Run tab: tick "Run now" on any row and the workflow runs within ten minutes, no menu needed. */
+var NEEDS_URL = ['4', '5', '13'];
+
+function fillRunTab_() {
+  var have = rows_('Run').map(function (r) { return String(r['No.']); });
+  Object.keys(MANUAL).forEach(function (k) {
+    if (have.indexOf(k) < 0) append_('Run', { 'No.': k, Workflow: MANUAL[k][0], 'Run now': false, 'Input (URL, if needed)': NEEDS_URL.indexOf(k) >= 0 ? 'Paste a page URL here' : '' });
+  });
+  var sh = tab_('Run');
+  sh.getRange(2, TABS.Run.indexOf('Run now') + 1, Math.max(sh.getLastRow() - 1, 1), 1).insertCheckboxes();
+  sh.setColumnWidth(2, 320);
+}
+
+function processRunTab_() {
+  rows_('Run').forEach(function (r) {
+    if (!isTrue_(r['Run now'])) return;
+    update_('Run', r._row, { 'Run now': false, 'Last run': new Date(), Result: 'Running' });
+    var job = MANUAL[String(r['No.'])], input = String(r['Input (URL, if needed)'] || '');
+    if (!/^https?:\/\//.test(input)) input = '';
+    var out;
+    try {
+      if (!job) throw new Error('Unknown workflow number');
+      if (NEEDS_URL.indexOf(String(r['No.'])) >= 0 && !input) throw new Error('Paste a page URL in the Input column first');
+      out = job[1](input) || 'Done';
+    } catch (err) { out = 'Error: ' + err.message; }
+    update_('Run', r._row, { Result: String(out).slice(0, 500) });
+    log_(job ? job[0] : 'Run tab', 'run from Run tab', out);
+  });
 }
