@@ -172,6 +172,38 @@ code{font:12.5px/1.4 ui-monospace,Menlo,monospace;background:var(--soft);border:
 .close .sub{color:rgba(255,255,255,.7);margin:16px auto 0}
 .close .btn{margin-top:28px;background:#fff;color:var(--ink);border-color:#fff}
 footer{padding:36px 0 52px;color:var(--faint);font-size:13.5px}
+
+/* navy theme */
+:root{--ink:#EEF1FF;--ink2:#C9CFEE;--mute:#A8B0D8;--faint:#7C85B3;--line:#252D5C;--soft:#121A45;--blue:#5B7CF6;--blue2:#1C2766;--gbg:rgba(22,163,74,.16);--green:#4ADE80;--abg:rgba(245,158,11,.16);--amber:#FBBF24}
+body{background:#0B1030;color:var(--ink)}
+.nav{background:rgba(11,16,48,.88);border-color:var(--line)}
+.btn{background:transparent;color:var(--ink);border-color:#323B73}.btn:hover{border-color:var(--ink)}.btn.primary{background:var(--blue);border-color:var(--blue);color:#fff}
+.nav .btn{background:#fff;color:#0B1030;border-color:#fff}
+.hero{background:radial-gradient(900px 480px at 85% 0%,rgba(79,116,242,.38),transparent 70%);padding-bottom:clamp(56px,8vw,96px)}
+.hero .tag{border-color:#2B3366}.hero .tag b{background:var(--blue);color:#fff}
+.built{border-color:var(--line)}
+.stage{background:var(--soft);border:1px solid var(--line);border-radius:22px;padding:clamp(16px,3vw,28px);margin-top:40px}
+.win,.card,.panel,.fig,.chart,.mini-email{background:#fff;color:#0F1222;border-color:#E7E9F0}
+.win .tbl th,.win small,.card .t,.panel th,.fig span,.chart .cr,.legend,.sheet th,.sheet td:first-child{color:#5B6178}
+.win .tbl td,.win .tbl th,.panel th,.panel td,.sheet td,.sheet th,.li,.seq li{border-color:#E7E9F0}
+.win-bar{border-color:#E7E9F0}.ev .ic{background:#F6F7FA;color:#2B2F45}
+.chip.ok{background:#EAF7EE;color:#16A34A}.chip.wait{background:#FEF3E2;color:#B45309}.chip.run{background:#E9EDFF;color:#2440D8}
+.card .chip.ok,.win .chip.ok{background:#EAF7EE;color:#16A34A}
+.fig b{color:#2440D8}.seq .k{background:#E9EDFF;color:#2440D8}.seq .av{background:#0B1030}.cb{background:#F1F3F8}
+.st{background:#EAF7EE;color:#16A34A}
+.step[aria-selected="true"]{background:var(--soft)}.shot{background:var(--soft);border-color:var(--line)}
+#week{background:#10173F!important}.day{background:var(--soft);border-color:var(--line)}.day .d{color:#9DB2FF}.day .card{background:#fff}
+#how{background:#10173F!important}
+.runs .run{background:var(--soft);border-color:var(--line);color:var(--ink)}.runs .ri,.guard .gic{background:var(--blue2);border-color:#2B3366;color:#C9D4FF}
+.diagram{background:var(--soft);border-color:var(--line)}.diagram .node{fill:#1A2357;stroke:#2E3875}.diagram .wire{stroke:#46519A}.diagram .lbl{fill:#EEF1FF}
+.wf-head:hover .wf-name{color:#9DB2FF}.wf-links a{color:#9DB2FF}.wf-toggle{border-color:#323B73}.wf-toggle::before,.wf-toggle::after{background:var(--ink)}
+.cat-tabs button[aria-selected="true"]{color:#fff;border-color:#fff}.cat-tabs .tc{background:var(--soft)}
+.example{background:var(--soft);border-color:var(--line)}.example-tag{background:var(--blue);color:#fff}
+.setup .box{border-color:var(--line);background:var(--soft)}.setup li::before{background:var(--blue2);border-color:#2B3366;color:#fff}
+code{background:#1A2357;border-color:#2E3875;color:#DCE3FF}
+.close{background:linear-gradient(135deg,#2440D8,#4F74F2)}.close .btn{background:#fff;color:#0B1030}
+a{color:inherit}footer a{color:#C9D4FF}
+
 @media (max-width:980px){.stage-grid,.switch,.ex-grid,.ex-two{grid-template-columns:1fr}.week{grid-template-columns:1fr 1fr}.runs{grid-template-columns:1fr}.figs,.stats{grid-template-columns:1fr 1fr}.stat:nth-child(3){border-left:0}.guards{grid-template-columns:1fr}.nav nav{display:none}.shot{position:static}
  .wf-head{grid-template-columns:1fr 26px;gap:4px 12px}.wf-name,.wf-problem,.wf-runs{grid-column:1}.wf-toggle{grid-column:2;grid-row:1}.wf-body{padding-left:4px}}
 @media (max-width:620px){.week,.setup,.figs{grid-template-columns:1fr}.seq li{grid-template-columns:28px 1fr}.seq .from{display:none}.seq .k{grid-column:2;justify-self:start}.tbl .hide{display:none}}
@@ -191,23 +223,6 @@ footer{padding:36px 0 52px;color:var(--faint);font-size:13.5px}
   <h1>Content Marketing On Autopilot, With You In Control</h1>
   <p class="sub">Content marketing workflows that automate repetitive tasks. All built on n8n and Google Apps Script, ready to import, adapt and scale.</p>
   <div class="cta"><a class="btn primary" href="#workflows">Browse The Workflows</a><a class="btn" href="https://github.com/archanacontent/content-marketing-automation-workflows">View On GitHub</a></div>
-  <div class="stage" aria-hidden="true"><div class="stage-grid">
-    <div class="win"><div class="win-bar"><span class="dots"><i></i><i></i><i></i></span>Control Sheet<span class="sp">Run tab</span></div>
-      <table class="tbl"><tr><th>Workflow</th><th class="hide">Runs</th><th>Status</th></tr>
-        <tr><td>Source Change Watch</td><td class="hide">Daily, 7:00</td><td><span class="chip ok">Done</span></td></tr>
-        <tr><td>Publishing QA</td><td class="hide">After each commit</td><td><span class="chip ok">Done</span></td></tr>
-        <tr><td>Course Sequence</td><td class="hide">Every 10 minutes</td><td><span class="chip run">Running</span></td></tr>
-        <tr><td>Distribution Drafts</td><td class="hide">On new content</td><td><span class="chip wait">Awaiting approval</span></td></tr>
-        <tr><td>Weekly Performance Report</td><td class="hide">Monday, 8:00</td><td><span class="chip ok">Sent</span></td></tr>
-      </table></div>
-    <div class="win"><div class="win-bar"><span class="dots"><i></i><i></i><i></i></span>Activity</div>
-      <div class="feed">
-        <div class="ev"><span class="ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h4"/></svg></span><span>Six official sources checked<small>Status, version and update dates compared</small></span></div>
-        <div class="ev"><span class="ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg></span><span>Lesson 3 sent to a subscriber<small>Next lesson due in 48 hours</small></span></div>
-        <div class="ev"><span class="ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></span><span>Enquiry answered with three samples<small>Tagged as a documentation project</small></span></div>
-        <div class="ev"><span class="ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 21h18M7 21V11M12 21V6M17 21v-7"/></svg></span><span>Weekly report delivered<small>Views, sources, sign-ups and enquiries</small></span></div>
-      </div></div>
-  </div></div>
 </div></div>
 <div class="wrap"><div class="built"><span>Runs on</span><b>Google Sheets</b><b>Google Apps Script</b><b>n8n</b><b>Gmail</b><b>Gemini</b><b>Google Analytics</b><b>GitHub Pages</b></div></div>
 
@@ -337,6 +352,23 @@ footer{padding:36px 0 52px;color:var(--faint);font-size:13.5px}
 <section id="how" style="background:var(--soft)"><div class="wrap">
   <h2>One Control Sheet, Two Platforms</h2>
   <p class="sub">A single Google Sheet acts as the control centre for both versions. Its tabs hold the settings, subscribers, email events, enquiries, monitored sources, the claims register, an approval queue and a run log, so every action leaves a record the team can audit.</p>
+    <div class="stage stage-how" aria-hidden="true"><div class="stage-grid">
+    <div class="win"><div class="win-bar"><span class="dots"><i></i><i></i><i></i></span>Control Sheet<span class="sp">Run tab</span></div>
+      <table class="tbl"><tr><th>Workflow</th><th class="hide">Runs</th><th>Status</th></tr>
+        <tr><td>Source Change Watch</td><td class="hide">Daily, 7:00</td><td><span class="chip ok">Done</span></td></tr>
+        <tr><td>Publishing QA</td><td class="hide">After each commit</td><td><span class="chip ok">Done</span></td></tr>
+        <tr><td>Course Sequence</td><td class="hide">Every 10 minutes</td><td><span class="chip run">Running</span></td></tr>
+        <tr><td>Distribution Drafts</td><td class="hide">On new content</td><td><span class="chip wait">Awaiting approval</span></td></tr>
+        <tr><td>Weekly Performance Report</td><td class="hide">Monday, 8:00</td><td><span class="chip ok">Sent</span></td></tr>
+      </table></div>
+    <div class="win"><div class="win-bar"><span class="dots"><i></i><i></i><i></i></span>Activity</div>
+      <div class="feed">
+        <div class="ev"><span class="ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h4"/></svg></span><span>Six official sources checked<small>Status, version and update dates compared</small></span></div>
+        <div class="ev"><span class="ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg></span><span>Lesson 3 sent to a subscriber<small>Next lesson due in 48 hours</small></span></div>
+        <div class="ev"><span class="ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></span><span>Enquiry answered with three samples<small>Tagged as a documentation project</small></span></div>
+        <div class="ev"><span class="ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 21h18M7 21V11M12 21V6M17 21v-7"/></svg></span><span>Weekly report delivered<small>Views, sources, sign-ups and enquiries</small></span></div>
+      </div></div>
+  </div></div>
   <div class="runs"><div class="run"><span class="ri"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M9 3v18"/></svg></span><h3>Google Apps Script</h3><p>The script project bound to the sheet contains one short loader, pasted once. On each run it loads the current workflow code from this repository, so fixes and new workflows reach the sheet without anyone copying code. Scheduled jobs run every 10 minutes, every morning at 7 and every Monday at 8, and a Run tab starts any workflow on demand with a single tick box.</p></div><div class="run"><span class="ri"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 2 4 14h7l-1 8 9-12h-7z"/></svg></span><h3>n8n</h3><p>Each workflow is a standalone file in the <code>n8n</code> folder. Import it by URL and attach Google and Gemini credentials. The Config node at the start holds every setting, ready for your own values.</p></div><div class="run"><span class="ri"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1"/><path d="M14 11a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1"/></svg></span><h3>Public pages</h3><p>The sign-up form, the enquiry form and the landing page behind every email link are hosted on GitHub Pages. Those pages pass requests to the workflows in the background, so a reader signed in to several Google accounts still lands on a working page.</p></div></div>
 </div></section>
 
