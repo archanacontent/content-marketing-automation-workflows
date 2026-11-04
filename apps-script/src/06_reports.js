@@ -163,7 +163,7 @@ function coursePostMortem_(force) {
   if (!force && (finished.length < subs.length || prop_('postmortem_count') === String(finished.length))) return 'Cohort still in the course';
   prop_('postmortem_count', String(finished.length));
   var stats = emailStats_().filter(function (s) { return /^Lesson|^Next-Best|^Re-Engagement/.test(s.message); });
-  var topics = {}; subs.forEach(function (s) { var t = s.Interest || 'no clicks'; topics[t] = (topics[t] || 0) + 1; });
+  var topics = {}; subs.forEach(function (s) { var t = s.Interest || 'none'; topics[t] = (topics[t] || 0) + 1; });
   var facts = { cohort_size: subs.length, finished: finished.length, unsubscribed: subs.filter(function (s) { return s.Status === 'unsubscribed'; }).length, sunset: subs.filter(function (s) { return s.Status === 'sunset'; }).length, per_email: stats, top_topics: topics };
   var notes;
   try {
@@ -173,7 +173,7 @@ function coursePostMortem_(force) {
   var html = '' +
     table_(['Cohort', 'Count'], [['Confirmed', facts.cohort_size], ['Finished Or Exited', facts.finished], ['Unsubscribed', facts.unsubscribed], ['Sunset', facts.sunset]]) +
     table_(['Email', 'Sent', 'Clicked', 'Click Rate'], stats.map(function (s) { return [s.message, s.sent, s.clicked, s.rate + '%']; })) +
-    table_(['Strongest Interest', 'Subscribers'], Object.keys(topics).map(function (k) { return [TOPICS[k] || k, topics[k]]; })) +
+    table_(['Strongest Interest', 'Subscribers'], Object.keys(topics).map(function (k) { return [TOPICS[k] || 'No Clicks', topics[k]]; })) +
     '<h3 style="font-size:15px">What Worked</h3>' + list(notes.worked) + '<h3 style="font-size:15px">What Underperformed</h3>' + list(notes.underperformed) + '<h3 style="font-size:15px">What To Change Next Time</h3>' + list(notes.change_next);
   append_('Queue', { ID: uid_('q'), Created: new Date(), Workflow: 'Course post-mortem', Kind: 'report', Target: 'course', Subject: 'Post-Mortem For A Cohort Of ' + subs.length, Draft: JSON.stringify(notes), Status: 'archived' });
   MailApp.sendEmail({ to: setting_('owner_email'), subject: '[Report] Course Post-Mortem', htmlBody: frame_(html, { title: 'Course Post-Mortem', label: 'Workflow 19', wide: true }), name: 'Content Marketing Automation' });

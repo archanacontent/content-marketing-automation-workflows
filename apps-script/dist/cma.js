@@ -242,16 +242,25 @@ function gemini_(prompt, opts) {
 
 /* House writing rules passed to Gemini whenever it drafts copy. */
 var WRITING_RULES = [
-  'Write in plain, professional British-neutral English for B2B readers.',
-  'Write every heading and email subject in Title Case, capitalising every word.',
-  'Lead with the reader\'s problem, then the practical fix.',
-  'No em dashes, no semicolons, no exclamation marks, no emojis, no hashtags unless asked.',
-  'Do not start sentences with This, These or That.',
-  'Avoid hype words: unlock, leverage, seamless, game-changer, cutting-edge, robust, elevate, delve, harness, streamline.',
-  'Vary sentence length. Keep every sentence under 35 words.',
+  'Write in plain, professional British-neutral English for B2B readers. The tone is premium, lucid and human, never salesy or casual.',
+  'Lead with the reader\'s problem, then the practical fix. Frame it as a problem solved, never as something being sold.',
+  'Write every heading, title and email subject in Title Case, capitalising every word, including short words such as and, for, of and to.',
+  'No em dashes, no semicolons, no exclamation marks, no emojis, no hashtags.',
+  'Do not start sentences with This, These, That, What, Why, How or When.',
+  'Do not use the pattern "not X but Y", lists of three parallel items, or a clause ending in a participle such as "..., making it easy".',
+  'Never use these words: unlock, leverage, seamless, game-changer, cutting-edge, robust, elevate, delve, harness, streamline, comprehensive, empower, solution, solves, revolutionise, transform, journey, landscape, crucial, essential.',
+  'Vary sentence length a lot. Average about 20 words, never more than 35, and avoid three sentences in a row of similar length.',
   'Write numbers as numerals, never as words.',
   'Never invent numbers, quotes or results. Use only facts given in the input.'
 ].join('\n');
+
+/* Title Case every word, as the house style requires, whatever the model returned. */
+function titleCase_(t) {
+  return String(t || '').replace(/\S+/g, function (w) {
+    if (/^(https?:|[A-Z0-9]{2,}$|[a-z]+[A-Z])/.test(w)) return w;
+    return w.charAt(0).toUpperCase() + w.slice(1);
+  });
+}
 
 /* Setup, menu, triggers and the scheduler that runs each workflow. */
 
@@ -774,7 +783,7 @@ function broadcastDraft_(item) {
   var draft = gemini_(WRITING_RULES + '\n\nWrite a short email (50 to 60 words) telling subscribers of a B2B SaaS launch course about a new piece of work. ' +
     'Open with one pain-point hook sentence about the reader problem it addresses, then say what they will find. Return JSON with keys subject (Title Case) and body (body as plain paragraphs separated by blank lines).\n\nTitle: ' + item.title + '\nURL: ' + item.url + '\nDescription: ' + item.description, { json: true });
   var topic = item.topic || 'none';
-  append_('Queue', { ID: uid_('q'), Created: new Date(), Workflow: 'New content broadcast', Kind: 'broadcast', Target: JSON.stringify({ url: item.url, topic: topic }), Subject: draft.subject, Draft: draft.body, Status: 'awaiting approval', Approved: false });
+  append_('Queue', { ID: uid_('q'), Created: new Date(), Workflow: 'New content broadcast', Kind: 'broadcast', Target: JSON.stringify({ url: item.url, topic: topic }), Subject: titleCase_(draft.subject), Draft: draft.body, Status: 'awaiting approval', Approved: false });
   formatQueue_();
   notifyOwner_('Broadcast Draft Ready For Approval', 'A broadcast for "' + item.title + '" is waiting in the Queue tab. Edit the subject or draft if needed, then tick Approved to send it.');
   return 'Draft added to the Queue tab';
@@ -1159,10 +1168,10 @@ function metadataSuggest_(url) {
 function distributionDrafts_(item) {
   item = item || promptContent_();
   if (!item) return 'Cancelled';
-  var out = gemini_(WRITING_RULES + '\n\nDraft posts announcing a new piece of work by a senior technical writer and B2B content marketer. ' +
+  var out = gemini_(WRITING_RULES + '\n\nDraft posts that the author of a new piece of work will publish under her own name. Write in the first person singular as the author, never naming her in the third person. ' +
     'Return JSON with keys linkedin (120 to 180 words, opens with the reader problem, no hashtags, link on its own final line) and reddit_title (under 90 characters, Title Case, a discussion question or observation, no clickbait) and reddit_body (100 to 150 words, written as a discussion starter for practitioners, not promotional, link mentioned once at the end as a resource).\n\n' +
     'Title: ' + item.title + '\nURL: ' + item.url + '\nDescription: ' + item.description + '\nPage text:\n' + item.text, { json: true });
-  var draft = 'LINKEDIN\n\n' + out.linkedin + '\n\n---\n\nREDDIT TITLE\n' + out.reddit_title + '\n\nREDDIT BODY\n' + out.reddit_body;
+  var draft = 'LINKEDIN\n\n' + out.linkedin + '\n\n---\n\nREDDIT TITLE\n' + titleCase_(out.reddit_title) + '\n\nREDDIT BODY\n' + out.reddit_body;
   append_('Queue', { ID: uid_('q'), Created: new Date(), Workflow: 'Distribution drafts', Kind: 'social', Target: item.url, Subject: 'Posts For ' + item.title, Draft: draft, Status: 'for review' });
   MailApp.sendEmail({ to: setting_('owner_email'), subject: '[Automation] Post Drafts: ' + item.title, htmlBody: frame_('<p>Drafts for your review. Edit them, then post them yourself.</p><pre style="white-space:pre-wrap;font-family:inherit">' + esc_(draft) + '</pre>', { title: 'Post Drafts For Review', label: 'Workflow 5' }), name: 'Content Marketing Automation' });
   return 'Drafts emailed and added to the Queue tab';
@@ -1352,7 +1361,7 @@ function coursePostMortem_(force) {
   if (!force && (finished.length < subs.length || prop_('postmortem_count') === String(finished.length))) return 'Cohort still in the course';
   prop_('postmortem_count', String(finished.length));
   var stats = emailStats_().filter(function (s) { return /^Lesson|^Next-Best|^Re-Engagement/.test(s.message); });
-  var topics = {}; subs.forEach(function (s) { var t = s.Interest || 'no clicks'; topics[t] = (topics[t] || 0) + 1; });
+  var topics = {}; subs.forEach(function (s) { var t = s.Interest || 'none'; topics[t] = (topics[t] || 0) + 1; });
   var facts = { cohort_size: subs.length, finished: finished.length, unsubscribed: subs.filter(function (s) { return s.Status === 'unsubscribed'; }).length, sunset: subs.filter(function (s) { return s.Status === 'sunset'; }).length, per_email: stats, top_topics: topics };
   var notes;
   try {
@@ -1362,7 +1371,7 @@ function coursePostMortem_(force) {
   var html = '' +
     table_(['Cohort', 'Count'], [['Confirmed', facts.cohort_size], ['Finished Or Exited', facts.finished], ['Unsubscribed', facts.unsubscribed], ['Sunset', facts.sunset]]) +
     table_(['Email', 'Sent', 'Clicked', 'Click Rate'], stats.map(function (s) { return [s.message, s.sent, s.clicked, s.rate + '%']; })) +
-    table_(['Strongest Interest', 'Subscribers'], Object.keys(topics).map(function (k) { return [TOPICS[k] || k, topics[k]]; })) +
+    table_(['Strongest Interest', 'Subscribers'], Object.keys(topics).map(function (k) { return [TOPICS[k] || 'No Clicks', topics[k]]; })) +
     '<h3 style="font-size:15px">What Worked</h3>' + list(notes.worked) + '<h3 style="font-size:15px">What Underperformed</h3>' + list(notes.underperformed) + '<h3 style="font-size:15px">What To Change Next Time</h3>' + list(notes.change_next);
   append_('Queue', { ID: uid_('q'), Created: new Date(), Workflow: 'Course post-mortem', Kind: 'report', Target: 'course', Subject: 'Post-Mortem For A Cohort Of ' + subs.length, Draft: JSON.stringify(notes), Status: 'archived' });
   MailApp.sendEmail({ to: setting_('owner_email'), subject: '[Report] Course Post-Mortem', htmlBody: frame_(html, { title: 'Course Post-Mortem', label: 'Workflow 19', wide: true }), name: 'Content Marketing Automation' });

@@ -250,7 +250,7 @@ function broadcastDraft_(item) {
   var draft = gemini_(WRITING_RULES + '\n\nWrite a short email (50 to 60 words) telling subscribers of a B2B SaaS launch course about a new piece of work. ' +
     'Open with one pain-point hook sentence about the reader problem it addresses, then say what they will find. Return JSON with keys subject (Title Case) and body (body as plain paragraphs separated by blank lines).\n\nTitle: ' + item.title + '\nURL: ' + item.url + '\nDescription: ' + item.description, { json: true });
   var topic = item.topic || 'none';
-  append_('Queue', { ID: uid_('q'), Created: new Date(), Workflow: 'New content broadcast', Kind: 'broadcast', Target: JSON.stringify({ url: item.url, topic: topic }), Subject: draft.subject, Draft: draft.body, Status: 'awaiting approval', Approved: false });
+  append_('Queue', { ID: uid_('q'), Created: new Date(), Workflow: 'New content broadcast', Kind: 'broadcast', Target: JSON.stringify({ url: item.url, topic: topic }), Subject: titleCase_(draft.subject), Draft: draft.body, Status: 'awaiting approval', Approved: false });
   formatQueue_();
   notifyOwner_('Broadcast Draft Ready For Approval', 'A broadcast for "' + item.title + '" is waiting in the Queue tab. Edit the subject or draft if needed, then tick Approved to send it.');
   return 'Draft added to the Queue tab';

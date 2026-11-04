@@ -25,9 +25,11 @@ CONFIG = """return [{ json: {
   linkSecret: 'REPLACE_WITH_A_LONG_RANDOM_STRING'
 } }];"""
 
-WRITING_RULES = ("Write in plain, professional English for B2B readers. Title Case for headings and subjects. "
-                 "Lead with the reader problem. No em dashes, semicolons, exclamation marks, emojis or hype words. "
-                 "Do not start sentences with This, These or That. Never invent numbers, quotes or results.")
+WRITING_RULES = ("Write in plain, professional British-neutral English for B2B readers, premium and human, never salesy. "
+                 "Title Case every word of headings and subjects, including and, for, of and to. Lead with the reader problem. "
+                 "No em dashes, semicolons, exclamation marks, emojis or hashtags. Do not start sentences with This, These, That, What, Why, How or When. "
+                 "Never use: unlock, leverage, seamless, robust, elevate, delve, harness, streamline, comprehensive, empower, solution, solves, transform. "
+                 "Use numerals for numbers. Never invent numbers, quotes or results.")
 
 
 class WF:
@@ -241,7 +243,7 @@ c = w.node("Config", *code(CONFIG), after=t)
 p = w.node("Fetch Page", *code("""const url = $('New Piece Form').first().json['Page URL'];
 const html = String(await this.helpers.httpRequest({ url }));
 return [{ json: { url, title: (html.match(/<title>([^<]+)<\\/title>/i) || [, ''])[1], text: html.replace(/<script[\\s\\S]*?<\\/script>|<style[\\s\\S]*?<\\/style>/gi, ' ').replace(/<[^>]+>/g, ' ').replace(/\\s+/g, ' ').slice(0, 6000) } }];"""), after=c)
-g = w.node("Draft Posts", *gemini("'" + WRITING_RULES + " Draft posts announcing this piece. Return JSON {linkedin (120 to 180 words, no hashtags, link on its own final line), reddit_title (Title Case, under 90 characters, a discussion question), reddit_body (100 to 150 words, discussion starter, link once at the end)}. Piece: ' + JSON.stringify($json)"), after=p, creds=GEMINI_CRED)
+g = w.node("Draft Posts", *gemini("'" + WRITING_RULES + " Draft posts the author will publish under her own name, written in the first person, never naming her in the third person. Return JSON {linkedin (120 to 180 words, no hashtags, link on its own final line), reddit_title (Title Case, under 90 characters, a discussion question), reddit_body (100 to 150 words, discussion starter, link once at the end)}. Piece: ' + JSON.stringify($json)"), after=p, creds=GEMINI_CRED)
 q = w.node("Prepare Drafts", *code("""const o = JSON.parse($json.candidates[0].content.parts[0].text), pg = $('Fetch Page').first().json;
 const draft = 'LINKEDIN\\n\\n' + o.linkedin + '\\n\\n---\\n\\nREDDIT TITLE\\n' + o.reddit_title + '\\n\\nREDDIT BODY\\n' + o.reddit_body;
 return [{ json: { ID: 'q' + Date.now(), Created: new Date().toISOString(), Workflow: 'Distribution drafts', Kind: 'social', Target: pg.url, Subject: 'Posts For ' + pg.title, Draft: draft, Status: 'for review' } }];"""), after=g)

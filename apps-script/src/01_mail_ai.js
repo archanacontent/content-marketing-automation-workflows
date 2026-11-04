@@ -122,13 +122,22 @@ function gemini_(prompt, opts) {
 
 /* House writing rules passed to Gemini whenever it drafts copy. */
 var WRITING_RULES = [
-  'Write in plain, professional British-neutral English for B2B readers.',
-  'Write every heading and email subject in Title Case, capitalising every word.',
-  'Lead with the reader\'s problem, then the practical fix.',
-  'No em dashes, no semicolons, no exclamation marks, no emojis, no hashtags unless asked.',
-  'Do not start sentences with This, These or That.',
-  'Avoid hype words: unlock, leverage, seamless, game-changer, cutting-edge, robust, elevate, delve, harness, streamline.',
-  'Vary sentence length. Keep every sentence under 35 words.',
+  'Write in plain, professional British-neutral English for B2B readers. The tone is premium, lucid and human, never salesy or casual.',
+  'Lead with the reader\'s problem, then the practical fix. Frame it as a problem solved, never as something being sold.',
+  'Write every heading, title and email subject in Title Case, capitalising every word, including short words such as and, for, of and to.',
+  'No em dashes, no semicolons, no exclamation marks, no emojis, no hashtags.',
+  'Do not start sentences with This, These, That, What, Why, How or When.',
+  'Do not use the pattern "not X but Y", lists of three parallel items, or a clause ending in a participle such as "..., making it easy".',
+  'Never use these words: unlock, leverage, seamless, game-changer, cutting-edge, robust, elevate, delve, harness, streamline, comprehensive, empower, solution, solves, revolutionise, transform, journey, landscape, crucial, essential.',
+  'Vary sentence length a lot. Average about 20 words, never more than 35, and avoid three sentences in a row of similar length.',
   'Write numbers as numerals, never as words.',
   'Never invent numbers, quotes or results. Use only facts given in the input.'
 ].join('\n');
+
+/* Title Case every word, as the house style requires, whatever the model returned. */
+function titleCase_(t) {
+  return String(t || '').replace(/\S+/g, function (w) {
+    if (/^(https?:|[A-Z0-9]{2,}$|[a-z]+[A-Z])/.test(w)) return w;
+    return w.charAt(0).toUpperCase() + w.slice(1);
+  });
+}

@@ -267,10 +267,10 @@ function metadataSuggest_(url) {
 function distributionDrafts_(item) {
   item = item || promptContent_();
   if (!item) return 'Cancelled';
-  var out = gemini_(WRITING_RULES + '\n\nDraft posts announcing a new piece of work by a senior technical writer and B2B content marketer. ' +
+  var out = gemini_(WRITING_RULES + '\n\nDraft posts that the author of a new piece of work will publish under her own name. Write in the first person singular as the author, never naming her in the third person. ' +
     'Return JSON with keys linkedin (120 to 180 words, opens with the reader problem, no hashtags, link on its own final line) and reddit_title (under 90 characters, Title Case, a discussion question or observation, no clickbait) and reddit_body (100 to 150 words, written as a discussion starter for practitioners, not promotional, link mentioned once at the end as a resource).\n\n' +
     'Title: ' + item.title + '\nURL: ' + item.url + '\nDescription: ' + item.description + '\nPage text:\n' + item.text, { json: true });
-  var draft = 'LINKEDIN\n\n' + out.linkedin + '\n\n---\n\nREDDIT TITLE\n' + out.reddit_title + '\n\nREDDIT BODY\n' + out.reddit_body;
+  var draft = 'LINKEDIN\n\n' + out.linkedin + '\n\n---\n\nREDDIT TITLE\n' + titleCase_(out.reddit_title) + '\n\nREDDIT BODY\n' + out.reddit_body;
   append_('Queue', { ID: uid_('q'), Created: new Date(), Workflow: 'Distribution drafts', Kind: 'social', Target: item.url, Subject: 'Posts For ' + item.title, Draft: draft, Status: 'for review' });
   MailApp.sendEmail({ to: setting_('owner_email'), subject: '[Automation] Post Drafts: ' + item.title, htmlBody: frame_('<p>Drafts for your review. Edit them, then post them yourself.</p><pre style="white-space:pre-wrap;font-family:inherit">' + esc_(draft) + '</pre>', { title: 'Post Drafts For Review', label: 'Workflow 5' }), name: 'Content Marketing Automation' });
   return 'Drafts emailed and added to the Queue tab';
