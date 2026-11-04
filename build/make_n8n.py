@@ -200,14 +200,14 @@ for (const site of cfg.guideSites) {
     let h; try { h = await this.helpers.httpRequest({ url: u }); } catch (e) { continue; } pages.push({ u, h: String(h) });
     for (const m of String(h).matchAll(/href="([^"#]+)"/g)) { const x = abs(m[1], u); if (x && x.startsWith(site) && !/\\.(pdf|docx|xlsx|pptx|png|jpg|svg|css|js|xml)$/i.test(x)) queue.push(x); } }
   const issues = [];
-  for (const p of pages) { const h = p.h, i = [];
+  for (const p of pages) { const h = p.h, i = []; if (/<meta name="robots" content="[^"]*noindex/i.test(h)) continue;
     if (!/<title>[^<]{5,}<\\/title>/i.test(h)) i.push('Missing title');
     const d = (h.match(/<meta name="description" content="([^"]*)"/i) || [])[1]; if (!d) i.push('Missing meta description'); else if (d.length > 160) i.push('Meta description over 160 characters');
     const h1 = (h.match(/<h1[\\s>]/gi) || []).length; if (h1 !== 1) i.push(h1 + ' H1 headings');
     const lv = (h.match(/<h([1-6])[\\s>]/gi) || []).map(t => +t[2]); for (let j = 1; j < lv.length; j++) if (lv[j] - lv[j - 1] > 1) { i.push('Heading level skipped'); break; }
     const na = (h.match(/<img(?![^>]*\\balt=)[^>]*>/gi) || []).length; if (na) i.push(na + ' image(s) without alt text');
     if (i.length) issues.push(p.u.replace(/^https:\\/\\/[^/]+/, '') + ': ' + i.join('; ')); }
-  const links = new Set(); pages.forEach(p => { for (const m of p.h.matchAll(/href="(https:[^"#]+)"/g)) links.add(m[1]); });
+  const links = new Set(); pages.forEach(p => { for (const m of p.h.replace(/<link\\b[^>]*>/gi, '').matchAll(/href="(https:[^"#]+)"/g)) links.add(m[1]); });
   for (const l of [...links].slice(0, 120)) { try { await this.helpers.httpRequest({ url: l, method: 'GET' }); } catch (e) { const code = e.httpCode || (e.response && e.response.status); if (code == 404 || code == 410 || code >= 500) issues.push('Broken link (' + code + '): ' + l); } }
   report.push({ repo, pages: pages.length, issues, sha: (sha || '').slice(0, 7) }); }
 return report.length ? [{ json: { report } }] : [];"""), after=c)

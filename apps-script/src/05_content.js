@@ -179,8 +179,11 @@ function absolute_(href, base) {
 
 function checkPage_(p) {
   var issues = [], h = p.html;
+  /* Pages that ask search engines not to index them, such as a site search page, need no SEO checks. */
+  if (/<meta name="robots" content="[^"]*noindex/i.test(h)) return issues;
   if (!/<title>[^<]{5,}<\/title>/i.test(h)) issues.push('Missing or empty title');
   var desc = (h.match(/<meta name="description" content="([^"]*)"/i) || [])[1];
+  if (desc) desc = desc.replace(/&#x?([0-9a-f]+);/gi, function (m, n) { return String.fromCharCode(parseInt(n, /x/i.test(m) ? 16 : 10)); }).replace(/&(amp|lt|gt|quot);/g, ' ');
   if (!desc) issues.push('Missing meta description');
   else if (desc.length > 160) issues.push('Meta description over 160 characters');
   var h1 = (h.match(/<h1[\s>]/gi) || []).length;
