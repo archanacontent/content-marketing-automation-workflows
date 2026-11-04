@@ -212,7 +212,14 @@ function reengage_() {
       if (send_({ to: s.Email, subject: REENGAGE.subject, html: body, workflow: 'Re-engagement', campaign: 'reengage', messageId: 'reengage', subscriberId: s.ID, marketing: true, isTest: isTrue_(s['Is test']) })) out.push(s.Email + ' re-engagement sent');
     }
   });
-  return out.join(', ') || 'No subscribers due';
+  if (!out.length) {
+    var waiting = rows_('Subscribers').filter(function (s) { return s.Status === 'active'; }).map(function (s) {
+      var c = events.filter(function (e) { return e['Subscriber ID'] === s.ID && e.Campaign === 'reengage' && e.Type === 'sent'; }).pop();
+      return c ? s.Email + ': re-engagement already sent ' + Utilities.formatDate(new Date(c.Time), Session.getScriptTimeZone(), 'd MMM HH:mm') + ', stops 7 days later unless they click' : '';
+    }).filter(String);
+    return waiting.length ? waiting.join('; ') : 'No subscribers due';
+  }
+  return out.join(', ');
 }
 
 function keep_(id) {

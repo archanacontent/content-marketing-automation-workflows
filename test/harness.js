@@ -59,7 +59,7 @@ global.HtmlService = { createHtmlOutput: h => ({ html: h, setTitle() { return th
 const routes = [];
 function respond(code, body, headers) { return { getResponseCode: () => code, getContentText: () => body, getHeaders: () => headers || { 'Content-Type': 'text/html' } }; }
 global.UrlFetchApp = {
-  fetch: (url, opts) => { for (const [re, fn] of routes) if (re.test(url)) return fn(url, opts); return respond(200, '<html><title>Page</title></html>'); },
+  fetch: (url, opts) => { for (const [re, fn] of routes) if (re.test(url)) return fn(url, opts); return respond(200, '<html><title>Page</title><p>In 2026, 45% of CVEs were deferred.</p></html>'); },
   fetchAll: reqs => reqs.map(r => global.UrlFetchApp.fetch(r.url, r))
 };
 global.AnalyticsData = { Properties: { runReport: (req) => ({ rows: req.dimensions[0].name === 'pagePath'
@@ -84,7 +84,8 @@ routes.push([/services\.nvd/, () => respond(200, JSON.stringify({ version: '2.0'
 routes.push([/api\.fda/, () => respond(200, JSON.stringify({ meta: { last_updated: '2026-10-30' } }))]);
 routes.push([/federalregister/, () => respond(200, JSON.stringify({ results: [{ document_number: '2026-12345' }] }))]);
 routes.push([/cisa\.gov/, () => respond(200, '{"vulnerabilities":[]}')]);
-routes.push([/api\.github\.com\/users/, () => respond(200, JSON.stringify(global.__repos || [{ name: 'b2b-saas' }]))]);
+routes.push([/github\.com\/archanacontent\.atom/, () => respond(200, (global.__repos || [{ name: 'b2b-saas' }]).map(r => '<title>archanacontent created a repository archanacontent/' + r.name + '</title>').join(''))]);
+routes.push([/commits\.atom/, () => respond(200, '<id>tag:github.com,2008:Grit::Commit/abc1234def</id>')]);
 routes.push([/git\/trees/, () => respond(200, JSON.stringify({ tree: [{ type: 'blob', path: 'docs/index.md' }] }))]);
 routes.push([/commits\?per_page/, () => respond(200, JSON.stringify([{ sha: 'abc1234def' }]))]);
 routes.push([/raw\.githubusercontent/, () => respond(200, '# Guide\nIn 2026 NVD changed. 45% of CVEs.')]);

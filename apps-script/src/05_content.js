@@ -9,8 +9,17 @@ var GUIDE_SITES = {
 };
 
 function guideRepos_() { return setting_('guide_repos').split(',').map(function (s) { return s.trim(); }).filter(String); }
-function gh_(path) { return fetchJson_('https://api.github.com' + path, { headers: { Accept: 'application/vnd.github+json' } }); }
-function raw_(repo, path) { return UrlFetchApp.fetch('https://raw.githubusercontent.com/' + setting_('github_owner') + '/' + repo + '/HEAD/' + path, { muteHttpExceptions: true }).getContentText(); }
+/* GitHub's API allows 60 anonymous calls an hour per IP, and Google's servers share IPs with
+   every other script. The public Atom feeds are not limited that way, so the workflows use them. */
+function atom_(url) { return UrlFetchApp.fetch(url, { muteHttpExceptions: true, headers: { Accept: 'application/atom+xml' } }).getContentText(); }
+function latestCommit_(repo) {
+  var m = atom_('https://github.com/' + setting_('github_owner') + '/' + repo + '/commits.atom').match(/Commit\/([0-9a-f]{7,40})/);
+  if (!m) throw new Error('Could not read the commit feed for ' + repo);
+  return m[1];
+}
+function siteOf_(repo) { return GUIDE_SITES[repo] || ('https://' + setting_('github_owner') + '.github.io/' + repo + '/'); }
+function pageText_(html) { return html.replace(/<script[\s\S]*?<\/script>|<style[\s\S]*?<\/style>|<nav[\s\S]*?<\/nav>/gi, ' ').replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim(); }
+
 function prop_(k, v) { var p = PropertiesService.getScriptProperties(); if (v === undefined) return p.getProperty(k); p.setProperty(k, v); }
 
 /* ---------- Workflow 1: source change watch ---------- */
@@ -66,18 +75,13 @@ function watchSources_() {
 
 /* ---------- Workflow 2: claims register and annual versioning ---------- */
 
-function docFiles_(repo) {
-  var tree = gh_('/repos/' + setting_('github_owner') + '/' + repo + '/git/trees/HEAD?recursive=1').tree || [];
-  return tree.filter(function (t) { return t.type === 'blob' && /\.(md|rst|dita)$/i.test(t.path) && !/^(LICENSE|CHANGELOG)/i.test(t.path.split('/').pop()); }).map(function (t) { return t.path; });
-}
-
 function seedClaims_() { /* The register is built on the first manual run of workflow 2, which reads every guide. */ }
 
 function buildClaims_() {
   var added = 0;
   guideRepos_().forEach(function (repo) {
-    docFiles_(repo).slice(0, 25).forEach(function (path) {
-      var text = raw_(repo, path);
+    crawl_(siteOf_(repo), 6).forEach(function (pg) {
+      var path = pg.url.replace(/^https:\/\/[^/]+/, ''), text = pageText_(pg.html);
       if (!/(19|20)\d\d|\d+(\.\d+)?\s?%|\bversion\b/i.test(text)) return;
       var found = [];
       try {
@@ -203,10 +207,10 @@ function brokenLinks_(pages) {
 function publishingQa_(manual) {
   var report = [], checked = 0;
   guideRepos_().forEach(function (repo) {
-    var sha = gh_('/repos/' + setting_('github_owner') + '/' + repo + '/commits?per_page=1')[0].sha;
+    var sha = latestCommit_(repo);
     if (!manual && prop_('qa_sha_' + repo) === sha) return;
     prop_('qa_sha_' + repo, sha);
-    var pages = crawl_(GUIDE_SITES[repo] || ('https://' + setting_('github_owner') + '.github.io/' + repo + '/'), 40);
+    var pages = crawl_(siteOf_(repo), 40);
     checked++;
     var pageIssues = pages.map(function (p) { return { url: p.url, issues: checkPage_(p) }; }).filter(function (x) { return x.issues.length; });
     var broken = brokenLinks_(pages);
@@ -261,15 +265,17 @@ function distributionDrafts_(item) {
 
 /* Detects a newly published piece (a new public repository) and starts workflows 5 and 13. */
 function detectNewContent_() {
-  var repos = gh_('/users/' + setting_('github_owner') + '/repos?sort=created&per_page=20');
+  var feed = atom_('https://github.com/' + setting_('github_owner') + '.atom');
+  var names = [], re = /created a repository [^/<\s]+\/([A-Za-z0-9._-]+)/g, m;
+  while ((m = re.exec(feed))) if (names.indexOf(m[1]) < 0) names.push(m[1]);
   var known = JSON.parse(prop_('known_repos') || 'null');
-  var names = repos.map(function (r) { return r.name; });
-  prop_('known_repos', JSON.stringify(names));
+  prop_('known_repos', JSON.stringify((known || []).concat(names.filter(function (n) { return (known || []).indexOf(n) < 0; }))));
   if (!known) return 'Baseline saved';
-  var fresh = repos.filter(function (r) { return known.indexOf(r.name) < 0 && !r.fork && !r.private; });
-  fresh.forEach(function (r) {
-    var item = contentFromUrl_(r.homepage || r.html_url);
-    if (!item.description) item.description = r.description || '';
+  var fresh = names.filter(function (n) { return known.indexOf(n) < 0; });
+  fresh.forEach(function (name) {
+    var site = 'https://' + setting_('github_owner') + '.github.io/' + name + '/';
+    var url = UrlFetchApp.fetch(site, { muteHttpExceptions: true }).getResponseCode() === 200 ? site : 'https://github.com/' + setting_('github_owner') + '/' + name;
+    var item = contentFromUrl_(url);
     distributionDrafts_(item);
     broadcastDraft_(item);
   });
