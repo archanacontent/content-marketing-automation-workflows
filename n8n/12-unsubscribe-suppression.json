@@ -1,0 +1,200 @@
+{
+  "name": "12 | Unsubscribe And Suppression",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## Unsubscribe And Suppression\nOne-click unsubscribe from every email. The subscriber's status changes to unsubscribed, and every sending workflow skips anyone who is unsubscribed or sunset.",
+        "height": 220,
+        "width": 520
+      },
+      "id": "9c8cd077-759f-5ba6-840a-cb2adb89d1b1",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        0,
+        20
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "GET",
+        "path": "cma-unsub",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "f65ea246-65f3-56e1-9700-c48f289b4013",
+      "name": "Unsubscribe Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{ json: {\n  sheetUrl: 'YOUR_CONTROL_SHEET_URL',\n  ownerEmail: 'YOUR_EMAIL',\n  ownerName: 'YOUR_NAME',\n  ga4PropertyId: 'YOUR_GA4_PROPERTY_ID',\n  siteUrl: 'https://YOUR_SITE/',\n  githubOwner: 'YOUR_GITHUB_USERNAME',\n  guideSites: ['https://YOUR_SITE/guide-one/', 'https://YOUR_SITE/guide-two/'],\n  pagesUrl: 'https://YOUR_SITE/your-repo/',\n  geminiModel: 'gemini-flash-latest',\n  linkSecret: 'REPLACE_WITH_A_LONG_RANDOM_STRING'\n} }];"
+      },
+      "id": "6786b134-feba-5c17-8403-86cde67d4376",
+      "name": "Config",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        240,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const cfg = $('Config').first().json;\nconst crypto = require('crypto');\nconst sign = (q, secret) => crypto.createHmac('sha256', secret).update(q).digest('base64url').slice(0, 16);\nconst link = (params) => { const q = Object.entries(params).map(([k, v]) => k + '=' + encodeURIComponent(v)).join('&');\n  return cfg.pagesUrl + 'go/?' + q + '&s=' + sign(q, cfg.linkSecret); };\nconst q = $('Unsubscribe Webhook').first().json.query; const { s, format, ...rest } = q;\nconst ok = s && s === sign(Object.entries(rest).map(([k, v]) => k + '=' + encodeURIComponent(v)).join('&'), cfg.linkSecret);\nreturn ok ? [{ json: { ID: rest.id, Status: 'unsubscribed', 'Next send': '' } }] : [];"
+      },
+      "id": "eb981561-6b88-5fe8-9bb5-8ad1765913b8",
+      "name": "Verify Signature",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        480,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "mode": "url",
+          "value": "={{ $('Config').first().json.sheetUrl }}"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Subscribers"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {},
+          "matchingColumns": [
+            "ID"
+          ]
+        },
+        "options": {}
+      },
+      "id": "87b76b5b-f0bd-52c9-b070-add6c73c8053",
+      "name": "Mark Unsubscribed",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        720,
+        300
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "",
+          "name": "googleSheetsOAuth2Api"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{ json: { title: 'You Are Unsubscribed', text: 'No more emails will be sent to this address.' } }];"
+      },
+      "id": "513b703a-64f5-5c87-a14a-ad9b3317d641",
+      "name": "Reply Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        960,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json) }}",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              }
+            ]
+          }
+        }
+      },
+      "id": "12bf26cc-2f40-57b4-94b7-fd560226f18c",
+      "name": "Respond",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        1200,
+        300
+      ]
+    }
+  ],
+  "connections": {
+    "Unsubscribe Webhook": {
+      "main": [
+        [
+          {
+            "node": "Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Config": {
+      "main": [
+        [
+          {
+            "node": "Verify Signature",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verify Signature": {
+      "main": [
+        [
+          {
+            "node": "Mark Unsubscribed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mark Unsubscribed": {
+      "main": [
+        [
+          {
+            "node": "Reply Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Reply Data": {
+      "main": [
+        [
+          {
+            "node": "Respond",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": false
+  }
+}

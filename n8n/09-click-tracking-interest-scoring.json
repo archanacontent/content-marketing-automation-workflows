@@ -1,0 +1,335 @@
+{
+  "name": "09 | Click Tracking And Interest Scoring",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## Click Tracking And Interest Scoring\nThe public link page calls this webhook for every course button. The click is logged, the subscriber's topic scores are updated, and the page then redirects the reader to the module. Ties go to the topic clicked most recently.",
+        "height": 220,
+        "width": 520
+      },
+      "id": "798bc7c1-2884-59ba-824c-256f90e3aff2",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        0,
+        20
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "GET",
+        "path": "cma-click",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "411c5419-d5ae-5951-b5f2-7c0ac1e977d2",
+      "name": "Click Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{ json: {\n  sheetUrl: 'YOUR_CONTROL_SHEET_URL',\n  ownerEmail: 'YOUR_EMAIL',\n  ownerName: 'YOUR_NAME',\n  ga4PropertyId: 'YOUR_GA4_PROPERTY_ID',\n  siteUrl: 'https://YOUR_SITE/',\n  githubOwner: 'YOUR_GITHUB_USERNAME',\n  guideSites: ['https://YOUR_SITE/guide-one/', 'https://YOUR_SITE/guide-two/'],\n  pagesUrl: 'https://YOUR_SITE/your-repo/',\n  geminiModel: 'gemini-flash-latest',\n  linkSecret: 'REPLACE_WITH_A_LONG_RANDOM_STRING'\n} }];"
+      },
+      "id": "22d5d872-83f7-562a-a677-131130d4ca0d",
+      "name": "Config",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        240,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const cfg = $('Config').first().json;\nconst crypto = require('crypto');\nconst sign = (q, secret) => crypto.createHmac('sha256', secret).update(q).digest('base64url').slice(0, 16);\nconst link = (params) => { const q = Object.entries(params).map(([k, v]) => k + '=' + encodeURIComponent(v)).join('&');\n  return cfg.pagesUrl + 'go/?' + q + '&s=' + sign(q, cfg.linkSecret); };\nconst q = $('Click Webhook').first().json.query; const { s, format, ...rest } = q;\nconst ok = s && s === sign(Object.entries(rest).map(([k, v]) => k + '=' + encodeURIComponent(v)).join('&'), cfg.linkSecret);\nreturn [{ json: { ok, ...rest } }];"
+      },
+      "id": "4b2924cc-6491-54fe-a59e-395bcea90402",
+      "name": "Verify Signature",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        480,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "read",
+        "documentId": {
+          "__rl": true,
+          "mode": "url",
+          "value": "={{ $('Config').first().json.sheetUrl }}"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Subscribers"
+        },
+        "options": {}
+      },
+      "id": "bee6619d-52ea-57ae-bb79-3b920d085dbf",
+      "name": "Read Subscribers",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        720,
+        300
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "",
+          "name": "googleSheetsOAuth2Api"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const p = $('Verify Signature').first().json; if (!p.ok || p.a !== 'c') return [];\nconst s = $input.all().map(i => i.json).find(r => r.ID === p.id); if (!s) return [];\nlet scores = {}; try { scores = JSON.parse(s.Scores || '{}'); } catch (e) {}\nif (p.t) scores[p.t] = (scores[p.t] || 0) + 1;\nconst top = Object.keys(scores).sort((a, b) => scores[b] - scores[a] || (b === p.t) - (a === p.t))[0] || '';\nreturn [{ json: { ID: s.ID, Clicks: Number(s.Clicks || 0) + 1, 'Last click': new Date().toISOString(), Scores: JSON.stringify(scores), Interest: top, _event: { Time: new Date().toISOString(), 'Subscriber ID': s.ID, Email: s.Email, Type: 'click', Campaign: 'course', Message: p.m, Link: p.u, Detail: p.t } } }];"
+      },
+      "id": "dbb13075-f4fb-56eb-bc84-dc62dd50ddc7",
+      "name": "Score Click",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        960,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "mode": "url",
+          "value": "={{ $('Config').first().json.sheetUrl }}"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Subscribers"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {},
+          "matchingColumns": [
+            "ID"
+          ]
+        },
+        "options": {}
+      },
+      "id": "04d48c39-bfc0-51a4-ab53-d06a2ef92b5a",
+      "name": "Update Scores",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        1200,
+        300
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "",
+          "name": "googleSheetsOAuth2Api"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{ json: $('Score Click').first().json._event }];"
+      },
+      "id": "c0cca5b0-c906-57b0-ab56-4a1d33f82479",
+      "name": "Event Row",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1440,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "mode": "url",
+          "value": "={{ $('Config').first().json.sheetUrl }}"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Events"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {},
+          "matchingColumns": []
+        },
+        "options": {}
+      },
+      "id": "af2bd04e-e409-503f-b4f6-63c98c34d319",
+      "name": "Log Event",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        1680,
+        300
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "",
+          "name": "googleSheetsOAuth2Api"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const u = $('Verify Signature').first().json.u || ''; return [{ json: { redirect: /^https:\\/\\/archanacontent\\.github\\.io\\//.test(u) ? u : 'https://archanacontent.github.io/b2b-saas/' } }];"
+      },
+      "id": "e0878538-8be7-5c17-a604-c04a502dfc17",
+      "name": "Redirect Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1920,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json) }}",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              }
+            ]
+          }
+        }
+      },
+      "id": "06368dfc-eb82-5642-9bb9-d2660ffd85f6",
+      "name": "Respond",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        2160,
+        300
+      ]
+    }
+  ],
+  "connections": {
+    "Click Webhook": {
+      "main": [
+        [
+          {
+            "node": "Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Config": {
+      "main": [
+        [
+          {
+            "node": "Verify Signature",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verify Signature": {
+      "main": [
+        [
+          {
+            "node": "Read Subscribers",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Subscribers": {
+      "main": [
+        [
+          {
+            "node": "Score Click",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Score Click": {
+      "main": [
+        [
+          {
+            "node": "Update Scores",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Scores": {
+      "main": [
+        [
+          {
+            "node": "Event Row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Event Row": {
+      "main": [
+        [
+          {
+            "node": "Log Event",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log Event": {
+      "main": [
+        [
+          {
+            "node": "Redirect Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Redirect Data": {
+      "main": [
+        [
+          {
+            "node": "Respond",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": false
+  }
+}

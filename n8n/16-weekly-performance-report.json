@@ -1,0 +1,432 @@
+{
+  "name": "16 | Weekly Performance Report",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## Weekly Performance Report\nEvery Monday: Google Analytics views per piece of work against the previous week, top traffic sources, Search Console clicks and impressions, sign-ups and enquiries. Gemini adds notes that keep measured facts apart from hypotheses.",
+        "height": 220,
+        "width": 520
+      },
+      "id": "a607878b-5f7b-5c85-bb83-c8c023851831",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        0,
+        20
+      ]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "weeks",
+              "triggerAtDay": [
+                1
+              ],
+              "triggerAtHour": 8
+            }
+          ]
+        }
+      },
+      "id": "0dc1a723-904e-56d0-b4c6-0bd11c3b9923",
+      "name": "Every Monday At 8",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{ json: {\n  sheetUrl: 'YOUR_CONTROL_SHEET_URL',\n  ownerEmail: 'YOUR_EMAIL',\n  ownerName: 'YOUR_NAME',\n  ga4PropertyId: 'YOUR_GA4_PROPERTY_ID',\n  siteUrl: 'https://YOUR_SITE/',\n  githubOwner: 'YOUR_GITHUB_USERNAME',\n  guideSites: ['https://YOUR_SITE/guide-one/', 'https://YOUR_SITE/guide-two/'],\n  pagesUrl: 'https://YOUR_SITE/your-repo/',\n  geminiModel: 'gemini-flash-latest',\n  linkSecret: 'REPLACE_WITH_A_LONG_RANDOM_STRING'\n} }];"
+      },
+      "id": "c0d92a73-eb28-5042-a210-a32eda7bc94f",
+      "name": "Config",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        240,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://analyticsdata.googleapis.com/v1beta/properties/{{ $('Config').first().json.ga4PropertyId }}:runReport",
+        "options": {},
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleAnalyticsOAuth2",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ dateRanges: [{ startDate: '7daysAgo', endDate: 'yesterday' }], dimensions: [{\"name\": \"pagePath\"}], metrics: [{\"name\": \"screenPageViews\"}], limit: 250 }) }}"
+      },
+      "id": "4da2cda9-71ce-512d-bbfc-5cb3e1da0d7f",
+      "name": "GA4 This Week",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        480,
+        300
+      ],
+      "credentials": {
+        "googleAnalyticsOAuth2": {
+          "id": "",
+          "name": "googleAnalyticsOAuth2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://analyticsdata.googleapis.com/v1beta/properties/{{ $('Config').first().json.ga4PropertyId }}:runReport",
+        "options": {},
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleAnalyticsOAuth2",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ dateRanges: [{ startDate: '14daysAgo', endDate: '8daysAgo' }], dimensions: [{\"name\": \"pagePath\"}], metrics: [{\"name\": \"screenPageViews\"}], limit: 250 }) }}"
+      },
+      "id": "f5690c68-d65b-50f2-89b8-da8a048c67af",
+      "name": "GA4 Last Week",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        720,
+        300
+      ],
+      "credentials": {
+        "googleAnalyticsOAuth2": {
+          "id": "",
+          "name": "googleAnalyticsOAuth2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://analyticsdata.googleapis.com/v1beta/properties/{{ $('Config').first().json.ga4PropertyId }}:runReport",
+        "options": {},
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleAnalyticsOAuth2",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ dateRanges: [{ startDate: '7daysAgo', endDate: 'yesterday' }], dimensions: [{\"name\": \"sessionSource\"}], metrics: [{\"name\": \"sessions\"}], limit: 250 }) }}"
+      },
+      "id": "8365b343-853b-5402-97a6-5d98d3cfd6c4",
+      "name": "GA4 Sources",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        960,
+        300
+      ],
+      "credentials": {
+        "googleAnalyticsOAuth2": {
+          "id": "",
+          "name": "googleAnalyticsOAuth2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://searchconsole.googleapis.com/webmasters/v3/sites/{{ encodeURIComponent($('Config').first().json.siteUrl) }}/searchAnalytics/query",
+        "options": {},
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleOAuth2Api",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ startDate: $now.minus({ days: 9 }).toFormat('yyyy-MM-dd'), endDate: $now.minus({ days: 3 }).toFormat('yyyy-MM-dd'), dimensions: ['page'], rowLimit: 25 }) }}"
+      },
+      "id": "70251c3c-515e-5e4b-985d-dca159af872f",
+      "name": "Search Console",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1200,
+        300
+      ],
+      "credentials": {
+        "googleOAuth2Api": {
+          "id": "",
+          "name": "googleOAuth2Api"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "read",
+        "documentId": {
+          "__rl": true,
+          "mode": "url",
+          "value": "={{ $('Config').first().json.sheetUrl }}"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Subscribers"
+        },
+        "options": {}
+      },
+      "id": "63bf9583-fda3-5fe1-99b8-70744b1b6ab5",
+      "name": "Read Subscribers",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        1440,
+        300
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "",
+          "name": "googleSheetsOAuth2Api"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "read",
+        "documentId": {
+          "__rl": true,
+          "mode": "url",
+          "value": "={{ $('Config').first().json.sheetUrl }}"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Enquiries"
+        },
+        "options": {}
+      },
+      "id": "8adde07f-fb25-5b26-b68b-85569e694afa",
+      "name": "Read Enquiries",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        1680,
+        300
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "",
+          "name": "googleSheetsOAuth2Api"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const piece = p => (String(p).split('/').filter(Boolean)[0] || 'Portfolio');\nconst sum = r => (r.rows || []).reduce((o, x) => { const k = piece(x.dimensionValues[0].value); o[k] = (o[k] || 0) + Number(x.metricValues[0].value); return o; }, {});\nconst a = sum($('GA4 This Week').first().json), b = sum($('GA4 Last Week').first().json);\nconst src = ($('GA4 Sources').first().json.rows || []).slice(0, 8).map(x => [x.dimensionValues[0].value, x.metricValues[0].value]);\nconst gsc = ($('Search Console').first().json.rows || []).slice(0, 10).map(r => [r.keys[0].replace(/^https:\\/\\/[^/]+/, ''), r.clicks, r.impressions]);\nconst wk = Date.now() - 7 * 864e5;\nconst signups = $('Read Subscribers').all().filter(i => new Date(i.json['Signed up']).getTime() > wk).length;\nconst enquiries = $input.all().filter(i => new Date(i.json.Received).getTime() > wk).length;\nreturn [{ json: { a, b, src, gsc, signups, enquiries } }];"
+      },
+      "id": "5a2a1f4f-2ce1-543a-bbdf-df49e52fca91",
+      "name": "Assemble Facts",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1920,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://generativelanguage.googleapis.com/v1beta/models/{{ $('Config').first().json.geminiModel }}:generateContent",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ contents: [{ role: 'user', parts: [{ text: 'Write in plain, professional English for B2B readers. Title Case for headings and subjects. Lead with the reader problem. No em dashes, semicolons, exclamation marks, emojis or hype words. Do not start sentences with This, These or That. Never invent numbers, quotes or results. Summarise this week for a content marketer. Return JSON {measured: up to 4 statements of what the numbers show, hypotheses: up to 3 possible reasons phrased as things to check}. Facts: ' + JSON.stringify($json) }] }], generationConfig: { temperature: 0.3, responseMimeType: 'application/json' } }) }}",
+        "options": {
+          "retry": {
+            "maxTries": 3,
+            "waitBetweenTries": 3000
+          }
+        }
+      },
+      "id": "af303710-8752-5560-9577-c41a32f9fe29",
+      "name": "Gemini Notes",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2160,
+        300
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "",
+          "name": "httpHeaderAuth"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const cfg = $('Config').first().json;\nconst brand = (o) => '<div style=\"background:#EFEBE3;padding:24px 10px\"><table role=\"presentation\" width=\"100%\" style=\"max-width:580px;margin:0 auto\">' +\n  '<tr><td style=\"background:#131416;padding:30px;border-radius:14px 14px 0 0\"><div style=\"font:700 11px Arial;letter-spacing:.18em;color:#D9A441\">' + o.owner.toUpperCase() + '</div>' +\n  (o.label ? '<div style=\"margin-top:14px;display:inline-block;border:1px solid #3A3B40;border-radius:999px;padding:5px 12px;font:600 12px Arial;color:#C9C4BA\">' + o.label + '</div>' : '') +\n  '<h1 style=\"margin:16px 0 0;font:800 26px/1.22 Arial;color:#F4F0E8\">' + o.title + '</h1></td></tr>' +\n  '<tr><td style=\"background:#fff;padding:30px;border-radius:0 0 14px 14px\">' +\n  (o.hook ? '<p style=\"margin:0 0 16px;font:600 18px/1.5 Arial;color:#17181B;border-left:3px solid #D9A441;padding-left:14px\">' + o.hook + '</p>' : '') +\n  (o.paras || []).map(p => '<p style=\"margin:0 0 14px;font:15.5px/1.65 Arial;color:#2B2C30\">' + p + '</p>').join('') + (o.html || '') +\n  (o.buttons || []).map((b, i) => '<a href=\"' + b.url + '\" style=\"display:block;margin:' + (i ? 10 : 22) + 'px 0 0;padding:15px;border-radius:999px;text-align:center;text-decoration:none;font:700 15px Arial;' +\n    (i ? 'border:2px solid #17181B;color:#17181B' : 'background:#D9A441;color:#17181B') + '\">' + b.text + ' &rarr;</a>').join('') +\n  '</td></tr>' + (o.footer ? '<tr><td style=\"padding:18px 30px 0;font:12px/1.6 Arial;color:#6B6862;text-align:center\">' + o.footer + '</td></tr>' : '') + '</table></div>';\nconst f = $('Assemble Facts').first().json; let n = { measured: [], hypotheses: [] }; try { n = JSON.parse($json.candidates[0].content.parts[0].text); } catch (e) {}\nconst t = (h, rows) => '<table style=\"width:100%;border-collapse:collapse;margin:8px 0 18px\">' + '<tr>' + h.map(x => '<th style=\"text-align:left;border-bottom:2px solid #17181B;padding:6px;font-size:13px\">' + x + '</th>').join('') + '</tr>' + rows.map(r => '<tr>' + r.map(x => '<td style=\"border-bottom:1px solid #E2DDD3;padding:6px;font-size:13px\">' + x + '</td>').join('') + '</tr>').join('') + '</table>';\nconst keys = [...new Set([...Object.keys(f.a), ...Object.keys(f.b)])];\nconst html = t(['Piece Of Work', 'Views', 'Previous Week'], keys.map(k => [k, f.a[k] || 0, f.b[k] || 0])) + t(['Traffic Source', 'Sessions'], f.src) + t(['Page (Search Console)', 'Clicks', 'Impressions'], f.gsc) +\n  t(['Lead Activity', 'This Week'], [['Course Sign-Ups', f.signups], ['Enquiries', f.enquiries]]) +\n  '<h3>What The Numbers Show</h3><ul>' + n.measured.map(x => '<li>' + x + '</li>').join('') + '</ul><h3>Possible Reasons To Check (AI Hypotheses, Not Verified)</h3><ul>' + n.hypotheses.map(x => '<li>' + x + '</li>').join('') + '</ul>';\nreturn [{ json: { html: brand({ owner: cfg.ownerName, label: 'Workflow 16', title: 'Weekly Performance Report', html }) } }];"
+      },
+      "id": "b76956eb-626b-5f75-a609-2de49de2f56d",
+      "name": "Build Report",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2400,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $('Config').first().json.ownerEmail }}",
+        "subject": "=[Report] Weekly Performance, Week Ending {{ $now.minus({ days: 1 }).toFormat('d LLL yyyy') }}",
+        "emailType": "html",
+        "message": "={{ $json.html }}",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "id": "1d567ac0-e160-5903-9cfa-77b9b8c3757f",
+      "name": "Email The Report",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        2640,
+        300
+      ],
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "",
+          "name": "gmailOAuth2"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Every Monday At 8": {
+      "main": [
+        [
+          {
+            "node": "Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Config": {
+      "main": [
+        [
+          {
+            "node": "GA4 This Week",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GA4 This Week": {
+      "main": [
+        [
+          {
+            "node": "GA4 Last Week",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GA4 Last Week": {
+      "main": [
+        [
+          {
+            "node": "GA4 Sources",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GA4 Sources": {
+      "main": [
+        [
+          {
+            "node": "Search Console",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Search Console": {
+      "main": [
+        [
+          {
+            "node": "Read Subscribers",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Subscribers": {
+      "main": [
+        [
+          {
+            "node": "Read Enquiries",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Enquiries": {
+      "main": [
+        [
+          {
+            "node": "Assemble Facts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Assemble Facts": {
+      "main": [
+        [
+          {
+            "node": "Gemini Notes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gemini Notes": {
+      "main": [
+        [
+          {
+            "node": "Build Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Report": {
+      "main": [
+        [
+          {
+            "node": "Email The Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": false
+  }
+}

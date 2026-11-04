@@ -1,0 +1,243 @@
+{
+  "name": "02 | Claims Register And Annual Versioning",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## Claims Register And Annual Versioning\nWeekly: flags claims past their recheck date. On 1 January: asks Gemini for an update brief per guide, listing what to re-verify for the new edition.",
+        "height": 220,
+        "width": 520
+      },
+      "id": "9ae9b53d-9132-5700-b601-4ee3e26528f3",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        0,
+        20
+      ]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "weeks",
+              "triggerAtDay": [
+                1
+              ],
+              "triggerAtHour": 7
+            }
+          ]
+        }
+      },
+      "id": "f7f3d6d5-b2eb-5bcf-bc91-f385778e986e",
+      "name": "Every Monday",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{ json: {\n  sheetUrl: 'YOUR_CONTROL_SHEET_URL',\n  ownerEmail: 'YOUR_EMAIL',\n  ownerName: 'YOUR_NAME',\n  ga4PropertyId: 'YOUR_GA4_PROPERTY_ID',\n  siteUrl: 'https://YOUR_SITE/',\n  githubOwner: 'YOUR_GITHUB_USERNAME',\n  guideSites: ['https://YOUR_SITE/guide-one/', 'https://YOUR_SITE/guide-two/'],\n  pagesUrl: 'https://YOUR_SITE/your-repo/',\n  geminiModel: 'gemini-flash-latest',\n  linkSecret: 'REPLACE_WITH_A_LONG_RANDOM_STRING'\n} }];"
+      },
+      "id": "011307b7-b4df-5736-a7fa-70388758e21c",
+      "name": "Config",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        240,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "read",
+        "documentId": {
+          "__rl": true,
+          "mode": "url",
+          "value": "={{ $('Config').first().json.sheetUrl }}"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Claims"
+        },
+        "options": {}
+      },
+      "id": "42f65fb3-8141-5402-8d7f-5ccc4dde1e81",
+      "name": "Read Claims",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        480,
+        300
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "",
+          "name": "googleSheetsOAuth2Api"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const now = Date.now(), due = [];\nfor (const i of $input.all()) { const c = i.json; const verified = c['Last verified'] ? new Date(c['Last verified']).getTime() : 0;\n  const next = verified ? verified + (Number(c['Cadence days']) || 90) * 864e5 : new Date(c['Recheck by']).getTime();\n  if (next < now) due.push(c); }\nconst d = new Date(); const annual = d.getMonth() === 0 && d.getDate() <= 7;\nreturn [{ json: { due, annual, year: d.getFullYear() } }];"
+      },
+      "id": "fee106ba-e853-5d70-921d-cf3932a541dd",
+      "name": "Find Due Claims",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        720,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://generativelanguage.googleapis.com/v1beta/models/{{ $('Config').first().json.geminiModel }}:generateContent",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ contents: [{ role: 'user', parts: [{ text: 'Write in plain, professional English for B2B readers. Title Case for headings and subjects. Lead with the reader problem. No em dashes, semicolons, exclamation marks, emojis or hype words. Do not start sentences with This, These or That. Never invent numbers, quotes or results. Write an update brief for the ' + $json.year + ' edition of each guide below. List what must be re-researched, grouped by guide and page, with the source to check. Do not guess new values. Return JSON: array of {guide, brief}. Claims: ' + JSON.stringify($json.due) }] }], generationConfig: { temperature: 0.3, responseMimeType: 'application/json' } }) }}",
+        "options": {
+          "retry": {
+            "maxTries": 3,
+            "waitBetweenTries": 3000
+          }
+        }
+      },
+      "id": "5f90357b-2b4a-54ea-a71c-29ad0cbe05e9",
+      "name": "Draft Annual Briefs",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        960,
+        300
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "",
+          "name": "httpHeaderAuth"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const cfg = $('Config').first().json;\nconst brand = (o) => '<div style=\"background:#EFEBE3;padding:24px 10px\"><table role=\"presentation\" width=\"100%\" style=\"max-width:580px;margin:0 auto\">' +\n  '<tr><td style=\"background:#131416;padding:30px;border-radius:14px 14px 0 0\"><div style=\"font:700 11px Arial;letter-spacing:.18em;color:#D9A441\">' + o.owner.toUpperCase() + '</div>' +\n  (o.label ? '<div style=\"margin-top:14px;display:inline-block;border:1px solid #3A3B40;border-radius:999px;padding:5px 12px;font:600 12px Arial;color:#C9C4BA\">' + o.label + '</div>' : '') +\n  '<h1 style=\"margin:16px 0 0;font:800 26px/1.22 Arial;color:#F4F0E8\">' + o.title + '</h1></td></tr>' +\n  '<tr><td style=\"background:#fff;padding:30px;border-radius:0 0 14px 14px\">' +\n  (o.hook ? '<p style=\"margin:0 0 16px;font:600 18px/1.5 Arial;color:#17181B;border-left:3px solid #D9A441;padding-left:14px\">' + o.hook + '</p>' : '') +\n  (o.paras || []).map(p => '<p style=\"margin:0 0 14px;font:15.5px/1.65 Arial;color:#2B2C30\">' + p + '</p>').join('') + (o.html || '') +\n  (o.buttons || []).map((b, i) => '<a href=\"' + b.url + '\" style=\"display:block;margin:' + (i ? 10 : 22) + 'px 0 0;padding:15px;border-radius:999px;text-align:center;text-decoration:none;font:700 15px Arial;' +\n    (i ? 'border:2px solid #17181B;color:#17181B' : 'background:#D9A441;color:#17181B') + '\">' + b.text + ' &rarr;</a>').join('') +\n  '</td></tr>' + (o.footer ? '<tr><td style=\"padding:18px 30px 0;font:12px/1.6 Arial;color:#6B6862;text-align:center\">' + o.footer + '</td></tr>' : '') + '</table></div>';\nconst d = $('Find Due Claims').first().json; let briefs = [];\ntry { briefs = d.annual ? JSON.parse($json.candidates[0].content.parts[0].text) : []; } catch (e) {}\nif (!d.due.length) return [];\nconst list = '<ul>' + d.due.map(c => '<li>' + c.Guide + ' / ' + c.Page + ': ' + c.Claim + '</li>').join('') + '</ul>' + briefs.map(b => '<h3>' + b.guide + '</h3><p>' + b.brief + '</p>').join('');\nreturn [{ json: { subject: '[Automation] ' + d.due.length + ' Claim(s) Due For A Recheck', html: brand({ owner: cfg.ownerName, label: 'Workflow 2', title: 'Claims Due For A Recheck', html: list }) } }];"
+      },
+      "id": "0634eaf4-c86f-521c-b10d-0177a5a492d7",
+      "name": "Build Email",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1200,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $('Config').first().json.ownerEmail }}",
+        "subject": "={{ $json.subject }}",
+        "emailType": "html",
+        "message": "={{ $json.html }}",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "id": "8bd16ba4-aaf9-5d1c-b24d-b4dce5fd057c",
+      "name": "Email The List",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        1440,
+        300
+      ],
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "",
+          "name": "gmailOAuth2"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Every Monday": {
+      "main": [
+        [
+          {
+            "node": "Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Config": {
+      "main": [
+        [
+          {
+            "node": "Read Claims",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Claims": {
+      "main": [
+        [
+          {
+            "node": "Find Due Claims",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Find Due Claims": {
+      "main": [
+        [
+          {
+            "node": "Draft Annual Briefs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Draft Annual Briefs": {
+      "main": [
+        [
+          {
+            "node": "Build Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Email": {
+      "main": [
+        [
+          {
+            "node": "Email The List",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": false
+  }
+}

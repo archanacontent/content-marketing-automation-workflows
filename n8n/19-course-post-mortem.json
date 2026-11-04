@@ -1,0 +1,284 @@
+{
+  "name": "19 | Course Post-Mortem",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## Course Post-Mortem\nWhen every confirmed subscriber in a cohort has finished or left the course, Gemini writes what worked, what underperformed and what to test next time, using only the recorded numbers.",
+        "height": 220,
+        "width": 520
+      },
+      "id": "c2aed6b2-d584-5bb8-aedc-de553f339292",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        0,
+        20
+      ]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "weeks",
+              "triggerAtDay": [
+                1
+              ],
+              "triggerAtHour": 9
+            }
+          ]
+        }
+      },
+      "id": "d7a3f94e-e57c-5bc5-9ee9-c02e5ad1e83e",
+      "name": "Every Monday At 9",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{ json: {\n  sheetUrl: 'YOUR_CONTROL_SHEET_URL',\n  ownerEmail: 'YOUR_EMAIL',\n  ownerName: 'YOUR_NAME',\n  ga4PropertyId: 'YOUR_GA4_PROPERTY_ID',\n  siteUrl: 'https://YOUR_SITE/',\n  githubOwner: 'YOUR_GITHUB_USERNAME',\n  guideSites: ['https://YOUR_SITE/guide-one/', 'https://YOUR_SITE/guide-two/'],\n  pagesUrl: 'https://YOUR_SITE/your-repo/',\n  geminiModel: 'gemini-flash-latest',\n  linkSecret: 'REPLACE_WITH_A_LONG_RANDOM_STRING'\n} }];"
+      },
+      "id": "8a05351c-ccba-5122-b504-d15a7a0a3663",
+      "name": "Config",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        240,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "read",
+        "documentId": {
+          "__rl": true,
+          "mode": "url",
+          "value": "={{ $('Config').first().json.sheetUrl }}"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Subscribers"
+        },
+        "options": {}
+      },
+      "id": "f9669016-2a0e-5789-9478-a688ab199ea0",
+      "name": "Read Subscribers",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        480,
+        300
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "",
+          "name": "googleSheetsOAuth2Api"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "read",
+        "documentId": {
+          "__rl": true,
+          "mode": "url",
+          "value": "={{ $('Config').first().json.sheetUrl }}"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Events"
+        },
+        "options": {}
+      },
+      "id": "83774f5b-6999-58b1-9845-1be6ccd81cb2",
+      "name": "Read Events",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        720,
+        300
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "",
+          "name": "googleSheetsOAuth2Api"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const subs = $('Read Subscribers').all().map(i => i.json).filter(s => s.Confirmed), store = $getWorkflowStaticData('global');\nconst done = subs.filter(s => Number(s['Course step']) >= 6 || ['unsubscribed', 'sunset'].includes(s.Status));\nif (!subs.length || done.length < subs.length || store.count === done.length) return []; store.count = done.length;\nconst ev = $input.all().map(i => i.json), per = {};\nfor (const e of ev) { if (!/^lesson-|^next-best|^reengage/.test(e.Message || '')) continue; per[e.Message] = per[e.Message] || { sent: 0, clicked: 0 }; if (e.Type === 'sent') per[e.Message].sent++; if (e.Type === 'click') per[e.Message].clicked++; }\nconst topics = subs.reduce((o, s) => { const t = s.Interest || 'no clicks'; o[t] = (o[t] || 0) + 1; return o; }, {});\nreturn [{ json: { cohort: subs.length, finished: done.length, per_email: per, topics } }];"
+      },
+      "id": "460ae1e5-430b-56c1-9022-65c1aca0fe2d",
+      "name": "Cohort Facts",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        960,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://generativelanguage.googleapis.com/v1beta/models/{{ $('Config').first().json.geminiModel }}:generateContent",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ contents: [{ role: 'user', parts: [{ text: 'Write in plain, professional English for B2B readers. Title Case for headings and subjects. Lead with the reader problem. No em dashes, semicolons, exclamation marks, emojis or hype words. Do not start sentences with This, These or That. Never invent numbers, quotes or results. Write a post-mortem of an email course cohort. Return JSON {worked, underperformed, change_next}, up to 3 items each, using only these facts. If the cohort is small, say results are directional. Facts: ' + JSON.stringify($json) }] }], generationConfig: { temperature: 0.3, responseMimeType: 'application/json' } }) }}",
+        "options": {
+          "retry": {
+            "maxTries": 3,
+            "waitBetweenTries": 3000
+          }
+        }
+      },
+      "id": "e13f47dd-8538-5f18-a06a-49e5b56c04f0",
+      "name": "Gemini Post-Mortem",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1200,
+        300
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "",
+          "name": "httpHeaderAuth"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const cfg = $('Config').first().json;\nconst brand = (o) => '<div style=\"background:#EFEBE3;padding:24px 10px\"><table role=\"presentation\" width=\"100%\" style=\"max-width:580px;margin:0 auto\">' +\n  '<tr><td style=\"background:#131416;padding:30px;border-radius:14px 14px 0 0\"><div style=\"font:700 11px Arial;letter-spacing:.18em;color:#D9A441\">' + o.owner.toUpperCase() + '</div>' +\n  (o.label ? '<div style=\"margin-top:14px;display:inline-block;border:1px solid #3A3B40;border-radius:999px;padding:5px 12px;font:600 12px Arial;color:#C9C4BA\">' + o.label + '</div>' : '') +\n  '<h1 style=\"margin:16px 0 0;font:800 26px/1.22 Arial;color:#F4F0E8\">' + o.title + '</h1></td></tr>' +\n  '<tr><td style=\"background:#fff;padding:30px;border-radius:0 0 14px 14px\">' +\n  (o.hook ? '<p style=\"margin:0 0 16px;font:600 18px/1.5 Arial;color:#17181B;border-left:3px solid #D9A441;padding-left:14px\">' + o.hook + '</p>' : '') +\n  (o.paras || []).map(p => '<p style=\"margin:0 0 14px;font:15.5px/1.65 Arial;color:#2B2C30\">' + p + '</p>').join('') + (o.html || '') +\n  (o.buttons || []).map((b, i) => '<a href=\"' + b.url + '\" style=\"display:block;margin:' + (i ? 10 : 22) + 'px 0 0;padding:15px;border-radius:999px;text-align:center;text-decoration:none;font:700 15px Arial;' +\n    (i ? 'border:2px solid #17181B;color:#17181B' : 'background:#D9A441;color:#17181B') + '\">' + b.text + ' &rarr;</a>').join('') +\n  '</td></tr>' + (o.footer ? '<tr><td style=\"padding:18px 30px 0;font:12px/1.6 Arial;color:#6B6862;text-align:center\">' + o.footer + '</td></tr>' : '') + '</table></div>';\nconst n = JSON.parse($json.candidates[0].content.parts[0].text), f = $('Cohort Facts').first().json, l = a => '<ul>' + (a || []).map(x => '<li>' + x + '</li>').join('') + '</ul>';\nreturn [{ json: { html: brand({ owner: cfg.ownerName, label: 'Workflow 19', title: 'Course Post-Mortem', paras: ['Cohort of ' + f.cohort + ', ' + f.finished + ' finished or exited.'], html: '<h3>What Worked</h3>' + l(n.worked) + '<h3>What Underperformed</h3>' + l(n.underperformed) + '<h3>What To Change Next Time</h3>' + l(n.change_next) }) } }];"
+      },
+      "id": "47b2809c-09a8-5785-913f-f32cd9f6bef9",
+      "name": "Build Email",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1440,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $('Config').first().json.ownerEmail }}",
+        "subject": "[Report] Course Post-Mortem",
+        "emailType": "html",
+        "message": "={{ $json.html }}",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "id": "4c84bf2b-a0ed-5d34-b8bb-32affd475293",
+      "name": "Email The Post-Mortem",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        1680,
+        300
+      ],
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "",
+          "name": "gmailOAuth2"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Every Monday At 9": {
+      "main": [
+        [
+          {
+            "node": "Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Config": {
+      "main": [
+        [
+          {
+            "node": "Read Subscribers",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Subscribers": {
+      "main": [
+        [
+          {
+            "node": "Read Events",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Events": {
+      "main": [
+        [
+          {
+            "node": "Cohort Facts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cohort Facts": {
+      "main": [
+        [
+          {
+            "node": "Gemini Post-Mortem",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gemini Post-Mortem": {
+      "main": [
+        [
+          {
+            "node": "Build Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Email": {
+      "main": [
+        [
+          {
+            "node": "Email The Post-Mortem",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": false
+  }
+}

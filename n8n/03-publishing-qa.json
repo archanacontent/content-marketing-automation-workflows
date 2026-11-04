@@ -1,0 +1,157 @@
+{
+  "name": "03 | Publishing QA",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## Publishing QA\nChecks each guide site after a new commit: titles, meta descriptions, one H1, heading order, alt text and broken links. Commit changes come from GitHub's public Atom feed, which avoids the API rate limit.",
+        "height": 220,
+        "width": 520
+      },
+      "id": "517a9fe2-5de3-5e61-b017-cbb8a58c3a67",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        0,
+        20
+      ]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 6
+            }
+          ]
+        }
+      },
+      "id": "4cd20edf-f008-5a7e-8fda-729c640add38",
+      "name": "Every 6 Hours",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{ json: {\n  sheetUrl: 'YOUR_CONTROL_SHEET_URL',\n  ownerEmail: 'YOUR_EMAIL',\n  ownerName: 'YOUR_NAME',\n  ga4PropertyId: 'YOUR_GA4_PROPERTY_ID',\n  siteUrl: 'https://YOUR_SITE/',\n  githubOwner: 'YOUR_GITHUB_USERNAME',\n  guideSites: ['https://YOUR_SITE/guide-one/', 'https://YOUR_SITE/guide-two/'],\n  pagesUrl: 'https://YOUR_SITE/your-repo/',\n  geminiModel: 'gemini-flash-latest',\n  linkSecret: 'REPLACE_WITH_A_LONG_RANDOM_STRING'\n} }];"
+      },
+      "id": "5dfdf5ea-6809-52d5-8dcc-09a9982f4e67",
+      "name": "Config",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        240,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const cfg = $('Config').first().json, store = $getWorkflowStaticData('global'), report = [];\nconst abs = (h, b) => { try { return new URL(h, b).href.split('#')[0]; } catch (e) { return null; } };\nfor (const site of cfg.guideSites) {\n  const repo = site.split('/').filter(Boolean).pop();\n  const feed = await this.helpers.httpRequest({ url: 'https://github.com/' + cfg.githubOwner + '/' + repo + '/commits.atom' });\n  const sha = (String(feed).match(/Commit\\/([0-9a-f]{7,40})/) || [])[1];\n  if (sha && store[repo] === sha) continue; store[repo] = sha;\n  const seen = new Set(), queue = [site], pages = [];\n  while (queue.length && pages.length < 40) { const u = queue.shift(); if (seen.has(u)) continue; seen.add(u);\n    let h; try { h = await this.helpers.httpRequest({ url: u }); } catch (e) { continue; } pages.push({ u, h: String(h) });\n    for (const m of String(h).matchAll(/href=\"([^\"#]+)\"/g)) { const x = abs(m[1], u); if (x && x.startsWith(site) && !/\\.(pdf|docx|xlsx|pptx|png|jpg|svg|css|js|xml)$/i.test(x)) queue.push(x); } }\n  const issues = [];\n  for (const p of pages) { const h = p.h, i = [];\n    if (!/<title>[^<]{5,}<\\/title>/i.test(h)) i.push('Missing title');\n    const d = (h.match(/<meta name=\"description\" content=\"([^\"]*)\"/i) || [])[1]; if (!d) i.push('Missing meta description'); else if (d.length > 160) i.push('Meta description over 160 characters');\n    const h1 = (h.match(/<h1[\\s>]/gi) || []).length; if (h1 !== 1) i.push(h1 + ' H1 headings');\n    const lv = (h.match(/<h([1-6])[\\s>]/gi) || []).map(t => +t[2]); for (let j = 1; j < lv.length; j++) if (lv[j] - lv[j - 1] > 1) { i.push('Heading level skipped'); break; }\n    const na = (h.match(/<img(?![^>]*\\balt=)[^>]*>/gi) || []).length; if (na) i.push(na + ' image(s) without alt text');\n    if (i.length) issues.push(p.u.replace(/^https:\\/\\/[^/]+/, '') + ': ' + i.join('; ')); }\n  const links = new Set(); pages.forEach(p => { for (const m of p.h.matchAll(/href=\"(https:[^\"#]+)\"/g)) links.add(m[1]); });\n  for (const l of [...links].slice(0, 120)) { try { await this.helpers.httpRequest({ url: l, method: 'GET' }); } catch (e) { const code = e.httpCode || (e.response && e.response.status); if (code == 404 || code == 410 || code >= 500) issues.push('Broken link (' + code + '): ' + l); } }\n  report.push({ repo, pages: pages.length, issues, sha: (sha || '').slice(0, 7) }); }\nreturn report.length ? [{ json: { report } }] : [];"
+      },
+      "id": "ea63691c-77db-5087-b007-10800596bd19",
+      "name": "Crawl And Check",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        480,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const cfg = $('Config').first().json;\nconst brand = (o) => '<div style=\"background:#EFEBE3;padding:24px 10px\"><table role=\"presentation\" width=\"100%\" style=\"max-width:580px;margin:0 auto\">' +\n  '<tr><td style=\"background:#131416;padding:30px;border-radius:14px 14px 0 0\"><div style=\"font:700 11px Arial;letter-spacing:.18em;color:#D9A441\">' + o.owner.toUpperCase() + '</div>' +\n  (o.label ? '<div style=\"margin-top:14px;display:inline-block;border:1px solid #3A3B40;border-radius:999px;padding:5px 12px;font:600 12px Arial;color:#C9C4BA\">' + o.label + '</div>' : '') +\n  '<h1 style=\"margin:16px 0 0;font:800 26px/1.22 Arial;color:#F4F0E8\">' + o.title + '</h1></td></tr>' +\n  '<tr><td style=\"background:#fff;padding:30px;border-radius:0 0 14px 14px\">' +\n  (o.hook ? '<p style=\"margin:0 0 16px;font:600 18px/1.5 Arial;color:#17181B;border-left:3px solid #D9A441;padding-left:14px\">' + o.hook + '</p>' : '') +\n  (o.paras || []).map(p => '<p style=\"margin:0 0 14px;font:15.5px/1.65 Arial;color:#2B2C30\">' + p + '</p>').join('') + (o.html || '') +\n  (o.buttons || []).map((b, i) => '<a href=\"' + b.url + '\" style=\"display:block;margin:' + (i ? 10 : 22) + 'px 0 0;padding:15px;border-radius:999px;text-align:center;text-decoration:none;font:700 15px Arial;' +\n    (i ? 'border:2px solid #17181B;color:#17181B' : 'background:#D9A441;color:#17181B') + '\">' + b.text + ' &rarr;</a>').join('') +\n  '</td></tr>' + (o.footer ? '<tr><td style=\"padding:18px 30px 0;font:12px/1.6 Arial;color:#6B6862;text-align:center\">' + o.footer + '</td></tr>' : '') + '</table></div>';\nconst html = $json.report.map(r => '<p><b>' + r.repo + '</b> (' + r.sha + '): ' + r.pages + ' pages' + (r.issues.length ? '' : ', no issues.') + '</p>' + (r.issues.length ? '<ul>' + r.issues.map(i => '<li>' + i + '</li>').join('') + '</ul>' : '')).join('');\nreturn [{ json: { subject: '[Automation] Publishing QA For ' + $json.report.length + ' Site(s)', html: brand({ owner: cfg.ownerName, label: 'Workflow 3', title: 'Publishing QA Results', html }) } }];"
+      },
+      "id": "79986f80-a16e-5e01-831c-7b8535e64057",
+      "name": "Build Report",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        720,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $('Config').first().json.ownerEmail }}",
+        "subject": "={{ $json.subject }}",
+        "emailType": "html",
+        "message": "={{ $json.html }}",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "id": "4c8e3b73-8bec-59bc-b7ae-021840ed00c8",
+      "name": "Email The Report",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        960,
+        300
+      ],
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "",
+          "name": "gmailOAuth2"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Every 6 Hours": {
+      "main": [
+        [
+          {
+            "node": "Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Config": {
+      "main": [
+        [
+          {
+            "node": "Crawl And Check",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Crawl And Check": {
+      "main": [
+        [
+          {
+            "node": "Build Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Report": {
+      "main": [
+        [
+          {
+            "node": "Email The Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": false
+  }
+}

@@ -1,0 +1,472 @@
+{
+  "name": "15 | Enquiry Capture And Follow-Up",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## Enquiry Capture And Follow-Up\nA public enquiry form. Gemini tags each enquiry by type and writes a one-line summary, the sender gets an instant reply with matching work samples, and you get an alert. A daily check reminds you of enquiries still unanswered after three days.",
+        "height": 220,
+        "width": 520
+      },
+      "id": "39202f51-819d-5e60-ad3a-842671eb53fb",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        0,
+        20
+      ]
+    },
+    {
+      "parameters": {
+        "formTitle": "Work With Archana",
+        "formDescription": "Tell me what you need. You will get a reply with relevant work samples straight away, and a personal reply after that.",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "Name",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Email",
+              "fieldType": "email",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Company"
+            },
+            {
+              "fieldLabel": "What Do You Need?",
+              "fieldType": "textarea",
+              "requiredField": true
+            }
+          ]
+        },
+        "options": {
+          "respondWithOptions": {
+            "values": {
+              "formSubmittedText": "Thanks. A confirmation is on its way to your inbox."
+            }
+          }
+        }
+      },
+      "id": "a1f48561-87bb-5e55-a9fd-8a699bb95076",
+      "name": "Enquiry Form",
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.2,
+      "position": [
+        0,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{ json: {\n  sheetUrl: 'YOUR_CONTROL_SHEET_URL',\n  ownerEmail: 'YOUR_EMAIL',\n  ownerName: 'YOUR_NAME',\n  ga4PropertyId: 'YOUR_GA4_PROPERTY_ID',\n  siteUrl: 'https://YOUR_SITE/',\n  githubOwner: 'YOUR_GITHUB_USERNAME',\n  guideSites: ['https://YOUR_SITE/guide-one/', 'https://YOUR_SITE/guide-two/'],\n  pagesUrl: 'https://YOUR_SITE/your-repo/',\n  geminiModel: 'gemini-flash-latest',\n  linkSecret: 'REPLACE_WITH_A_LONG_RANDOM_STRING'\n} }];"
+      },
+      "id": "29f0460b-5642-58d2-ac5a-fe21cc514d90",
+      "name": "Config",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        240,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://generativelanguage.googleapis.com/v1beta/models/{{ $('Config').first().json.geminiModel }}:generateContent",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ contents: [{ role: 'user', parts: [{ text: 'Classify this enquiry sent to a senior technical writer and B2B content marketer. Return JSON {type: one of Full-time role, Documentation project, Content marketing project, Other; summary: one sentence under 25 words using only facts from the message}. Company: ' + $('Enquiry Form').first().json.Company + '. Message: ' + $('Enquiry Form').first().json['What Do You Need?'] }] }], generationConfig: { temperature: 0.3, responseMimeType: 'application/json' } }) }}",
+        "options": {
+          "retry": {
+            "maxTries": 3,
+            "waitBetweenTries": 3000
+          }
+        }
+      },
+      "id": "d67b3c7f-6623-5525-a5fd-db8e2c8eb808",
+      "name": "Tag With Gemini",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        480,
+        300
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "",
+          "name": "httpHeaderAuth"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const cfg = $('Config').first().json;\nconst brand = (o) => '<div style=\"background:#EFEBE3;padding:24px 10px\"><table role=\"presentation\" width=\"100%\" style=\"max-width:580px;margin:0 auto\">' +\n  '<tr><td style=\"background:#131416;padding:30px;border-radius:14px 14px 0 0\"><div style=\"font:700 11px Arial;letter-spacing:.18em;color:#D9A441\">' + o.owner.toUpperCase() + '</div>' +\n  (o.label ? '<div style=\"margin-top:14px;display:inline-block;border:1px solid #3A3B40;border-radius:999px;padding:5px 12px;font:600 12px Arial;color:#C9C4BA\">' + o.label + '</div>' : '') +\n  '<h1 style=\"margin:16px 0 0;font:800 26px/1.22 Arial;color:#F4F0E8\">' + o.title + '</h1></td></tr>' +\n  '<tr><td style=\"background:#fff;padding:30px;border-radius:0 0 14px 14px\">' +\n  (o.hook ? '<p style=\"margin:0 0 16px;font:600 18px/1.5 Arial;color:#17181B;border-left:3px solid #D9A441;padding-left:14px\">' + o.hook + '</p>' : '') +\n  (o.paras || []).map(p => '<p style=\"margin:0 0 14px;font:15.5px/1.65 Arial;color:#2B2C30\">' + p + '</p>').join('') + (o.html || '') +\n  (o.buttons || []).map((b, i) => '<a href=\"' + b.url + '\" style=\"display:block;margin:' + (i ? 10 : 22) + 'px 0 0;padding:15px;border-radius:999px;text-align:center;text-decoration:none;font:700 15px Arial;' +\n    (i ? 'border:2px solid #17181B;color:#17181B' : 'background:#D9A441;color:#17181B') + '\">' + b.text + ' &rarr;</a>').join('') +\n  '</td></tr>' + (o.footer ? '<tr><td style=\"padding:18px 30px 0;font:12px/1.6 Arial;color:#6B6862;text-align:center\">' + o.footer + '</td></tr>' : '') + '</table></div>';\nconst f = $('Enquiry Form').first().json; let tag = { type: 'Other', summary: '' };\ntry { tag = JSON.parse($json.candidates[0].content.parts[0].text); } catch (e) {}\nconst LINKS = { 'Full-time role': [['View The Portfolio', 'https://archanacontent.github.io/'], ['Read The NVD Developer Guide', 'https://github.com/archanacontent/nvd-cve-api-docs'], ['Open The Launch Playbook', 'https://archanacontent.github.io/b2b-saas/']],\n  'Documentation project': [['Read The NVD Developer Guide', 'https://github.com/archanacontent/nvd-cve-api-docs'], ['Read The openFDA Guide', 'https://archanacontent.github.io/openfda-drug-safety-guide/'], ['Read The Medicaid Guide', 'https://archanacontent.github.io/medicaid-2027-implementation-guide/']],\n  'Content marketing project': [['Open The Launch Playbook', 'https://archanacontent.github.io/b2b-saas/'], ['See The RFP Response', 'https://archanacontent.github.io/rfp-response/'], ['View The Portfolio', 'https://archanacontent.github.io/']],\n  Other: [['View The Portfolio', 'https://archanacontent.github.io/']] };\nconst links = LINKS[tag.type] || LINKS.Other;\nreturn [{ json: { ID: 'e' + Date.now(), Received: new Date().toISOString(), Name: f.Name, Email: f.Email, Company: f.Company || '', Message: f['What Do You Need?'], Type: tag.type, Summary: tag.summary, 'Auto reply sent': new Date().toISOString(), Replied: false,\n  _reply: brand({ owner: cfg.ownerName, label: 'Message Received', title: 'Thanks For Your Message', hook: 'A message sent through a portfolio site often disappears without a reply, so here is confirmation that yours has arrived.',\n    paras: ['I read every enquiry myself and will reply personally within two working days. Until then, the three samples below are the closest match to the work you described in your message.'], buttons: links.map(l => ({ text: l[0], url: l[1] })) }) } }];"
+      },
+      "id": "b57661ef-8c7b-50d5-9379-afdf8040f283",
+      "name": "Prepare Row And Reply",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        720,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "mode": "url",
+          "value": "={{ $('Config').first().json.sheetUrl }}"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Enquiries"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {},
+          "matchingColumns": []
+        },
+        "options": {}
+      },
+      "id": "569640b4-eb3f-53c9-b140-211e4c76f3f1",
+      "name": "Store Enquiry",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        960,
+        300
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "",
+          "name": "googleSheetsOAuth2Api"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $('Prepare Row And Reply').first().json.Email }}",
+        "subject": "Thanks For Your Message",
+        "emailType": "html",
+        "message": "={{ $('Prepare Row And Reply').first().json._reply }}",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "id": "56301e86-cff2-51bf-82a7-e838b07617c5",
+      "name": "Auto-Reply",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        1200,
+        300
+      ],
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "",
+          "name": "gmailOAuth2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $('Config').first().json.ownerEmail }}",
+        "subject": "=[Automation] New Enquiry: {{ $('Prepare Row And Reply').first().json.Type }}",
+        "emailType": "html",
+        "message": "={{ $('Prepare Row And Reply').first().json.Name }}: {{ $('Prepare Row And Reply').first().json.Summary }}",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "id": "8d3761e3-9b34-5757-911c-89899adb2b56",
+      "name": "Alert Owner",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        1440,
+        300
+      ],
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "",
+          "name": "gmailOAuth2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "days",
+              "triggerAtHour": 9
+            }
+          ]
+        }
+      },
+      "id": "e9ce4d56-ba69-5089-9817-b25d2e9ed44e",
+      "name": "Daily Reminder Check",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        560
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{ json: {\n  sheetUrl: 'YOUR_CONTROL_SHEET_URL',\n  ownerEmail: 'YOUR_EMAIL',\n  ownerName: 'YOUR_NAME',\n  ga4PropertyId: 'YOUR_GA4_PROPERTY_ID',\n  siteUrl: 'https://YOUR_SITE/',\n  githubOwner: 'YOUR_GITHUB_USERNAME',\n  guideSites: ['https://YOUR_SITE/guide-one/', 'https://YOUR_SITE/guide-two/'],\n  pagesUrl: 'https://YOUR_SITE/your-repo/',\n  geminiModel: 'gemini-flash-latest',\n  linkSecret: 'REPLACE_WITH_A_LONG_RANDOM_STRING'\n} }];"
+      },
+      "id": "30e6acde-4fd8-5c75-8b53-42be82ae4959",
+      "name": "Config (Reminders)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        240,
+        560
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "read",
+        "documentId": {
+          "__rl": true,
+          "mode": "url",
+          "value": "={{ $('Config').first().json.sheetUrl }}"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Enquiries"
+        },
+        "options": {}
+      },
+      "id": "4059ccf9-e484-5480-80d1-862e7dfb6de2",
+      "name": "Read Enquiries",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        480,
+        560
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "",
+          "name": "googleSheetsOAuth2Api"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "return $input.all().map(i => i.json).filter(q => String(q.Replied).toUpperCase() !== 'TRUE' && !q['Reminder sent'] && Date.now() - new Date(q.Received).getTime() > 3 * 864e5)\n  .map(q => ({ json: { ID: q.ID, 'Reminder sent': new Date().toISOString(), _text: q.Name + ' (' + q.Email + ') is still waiting for a reply. ' + (q.Summary || '') } }));"
+      },
+      "id": "35ab3cb9-ead1-58aa-8ab0-c12fc6410406",
+      "name": "Find Overdue",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        720,
+        560
+      ]
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $('Config (Reminders)').first().json.ownerEmail }}",
+        "subject": "[Automation] Enquiry Waiting 3 Days",
+        "emailType": "html",
+        "message": "={{ $json._text }}",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "id": "b96ad1d7-2045-5fda-a679-1891bcc7739b",
+      "name": "Remind Owner",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        960,
+        560
+      ],
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "",
+          "name": "gmailOAuth2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "mode": "url",
+          "value": "={{ $('Config').first().json.sheetUrl }}"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Enquiries"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {},
+          "matchingColumns": [
+            "ID"
+          ]
+        },
+        "options": {}
+      },
+      "id": "fd500e2f-65f8-55f5-b07a-565692119b1a",
+      "name": "Mark Reminded",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        1200,
+        560
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "",
+          "name": "googleSheetsOAuth2Api"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Enquiry Form": {
+      "main": [
+        [
+          {
+            "node": "Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Config": {
+      "main": [
+        [
+          {
+            "node": "Tag With Gemini",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tag With Gemini": {
+      "main": [
+        [
+          {
+            "node": "Prepare Row And Reply",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Row And Reply": {
+      "main": [
+        [
+          {
+            "node": "Store Enquiry",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Store Enquiry": {
+      "main": [
+        [
+          {
+            "node": "Auto-Reply",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Auto-Reply": {
+      "main": [
+        [
+          {
+            "node": "Alert Owner",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Daily Reminder Check": {
+      "main": [
+        [
+          {
+            "node": "Config (Reminders)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Config (Reminders)": {
+      "main": [
+        [
+          {
+            "node": "Read Enquiries",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Enquiries": {
+      "main": [
+        [
+          {
+            "node": "Find Overdue",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Find Overdue": {
+      "main": [
+        [
+          {
+            "node": "Remind Owner",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Remind Owner": {
+      "main": [
+        [
+          {
+            "node": "Mark Reminded",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": false
+  }
+}

@@ -1,0 +1,66 @@
+{
+  "name": "14 | Pre-Send QA",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## Pre-Send QA\nA sub-workflow every sending workflow can call before Gmail. It blocks emails with unfilled merge fields, missing unsubscribe links, spam-trigger wording, non-https links or broken links, and returns the problems found.",
+        "height": 220,
+        "width": 520
+      },
+      "id": "c3a9e68c-b87f-5256-8f4c-8d14779b733d",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        0,
+        20
+      ]
+    },
+    {
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "id": "4495db5d-8b19-5811-be18-9b01a46c11c1",
+      "name": "Called By Another Workflow",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const SPAM = ['act now', 'free money', 'guaranteed', '100% free', 'risk-free', 'click here', 'winner', 'urgent', 'limited time', 'cash bonus', 'no obligation', 'buy now'];\nconst out = [];\nfor (const i of $input.all()) { const m = i.json, html = m._html || '', subject = m._subject || '', p = [];\n  if (subject.length < 4) p.push('Subject missing'); if (subject.length > 78) p.push('Subject longer than 78 characters');\n  if (/\\{\\{[^}]*\\}\\}|undefined|NaN/.test(subject + html)) p.push('Unfilled merge field');\n  if (m._marketing && !html.includes('a=unsub')) p.push('Unsubscribe link missing');\n  const low = (subject + html).toLowerCase(); SPAM.forEach(w => { if (low.includes(w)) p.push('Spam-trigger wording: ' + w); });\n  for (const h of html.matchAll(/href=\"([^\"]+)\"/g)) { const u = h[1]; if (!/^https:\\/\\//.test(u) && !/^mailto:/.test(u)) p.push('Link is not https: ' + u);\n    else if (m._checkLinks) { try { await this.helpers.httpRequest({ url: u }); } catch (e) { p.push('Broken link: ' + u); } } }\n  out.push({ json: { ...m, _qaProblems: p, _qaPassed: p.length === 0 } }); }\nreturn out;"
+      },
+      "id": "ce703529-6c68-51ef-a553-60bd39712b4d",
+      "name": "Check Email",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        240,
+        300
+      ]
+    }
+  ],
+  "connections": {
+    "Called By Another Workflow": {
+      "main": [
+        [
+          {
+            "node": "Check Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": false
+  }
+}

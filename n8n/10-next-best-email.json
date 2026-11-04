@@ -1,0 +1,246 @@
+{
+  "name": "10 | Next-Best Email",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## Next-Best Email\nAfter Lesson 5, each subscriber receives one follow-up chosen by their strongest topic. Subscribers with no clicks get a gentle pointer to the playbook home page.",
+        "height": 220,
+        "width": 520
+      },
+      "id": "4e91e8fa-0785-584b-becd-5c4c0c8e1cc9",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        0,
+        20
+      ]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 1
+            }
+          ]
+        }
+      },
+      "id": "1b338a20-b100-52ee-8c90-52614da734f3",
+      "name": "Every Hour",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{ json: {\n  sheetUrl: 'YOUR_CONTROL_SHEET_URL',\n  ownerEmail: 'YOUR_EMAIL',\n  ownerName: 'YOUR_NAME',\n  ga4PropertyId: 'YOUR_GA4_PROPERTY_ID',\n  siteUrl: 'https://YOUR_SITE/',\n  githubOwner: 'YOUR_GITHUB_USERNAME',\n  guideSites: ['https://YOUR_SITE/guide-one/', 'https://YOUR_SITE/guide-two/'],\n  pagesUrl: 'https://YOUR_SITE/your-repo/',\n  geminiModel: 'gemini-flash-latest',\n  linkSecret: 'REPLACE_WITH_A_LONG_RANDOM_STRING'\n} }];"
+      },
+      "id": "3b472940-b23b-59bb-a4d4-e233a8ea977d",
+      "name": "Config",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        240,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "read",
+        "documentId": {
+          "__rl": true,
+          "mode": "url",
+          "value": "={{ $('Config').first().json.sheetUrl }}"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Subscribers"
+        },
+        "options": {}
+      },
+      "id": "d2db7e26-e944-52d8-979d-9e83f7d92355",
+      "name": "Read Subscribers",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        480,
+        300
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "",
+          "name": "googleSheetsOAuth2Api"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const cfg = $('Config').first().json;\nconst crypto = require('crypto');\nconst sign = (q, secret) => crypto.createHmac('sha256', secret).update(q).digest('base64url').slice(0, 16);\nconst link = (params) => { const q = Object.entries(params).map(([k, v]) => k + '=' + encodeURIComponent(v)).join('&');\n  return cfg.pagesUrl + 'go/?' + q + '&s=' + sign(q, cfg.linkSecret); };const brand = (o) => '<div style=\"background:#EFEBE3;padding:24px 10px\"><table role=\"presentation\" width=\"100%\" style=\"max-width:580px;margin:0 auto\">' +\n  '<tr><td style=\"background:#131416;padding:30px;border-radius:14px 14px 0 0\"><div style=\"font:700 11px Arial;letter-spacing:.18em;color:#D9A441\">' + o.owner.toUpperCase() + '</div>' +\n  (o.label ? '<div style=\"margin-top:14px;display:inline-block;border:1px solid #3A3B40;border-radius:999px;padding:5px 12px;font:600 12px Arial;color:#C9C4BA\">' + o.label + '</div>' : '') +\n  '<h1 style=\"margin:16px 0 0;font:800 26px/1.22 Arial;color:#F4F0E8\">' + o.title + '</h1></td></tr>' +\n  '<tr><td style=\"background:#fff;padding:30px;border-radius:0 0 14px 14px\">' +\n  (o.hook ? '<p style=\"margin:0 0 16px;font:600 18px/1.5 Arial;color:#17181B;border-left:3px solid #D9A441;padding-left:14px\">' + o.hook + '</p>' : '') +\n  (o.paras || []).map(p => '<p style=\"margin:0 0 14px;font:15.5px/1.65 Arial;color:#2B2C30\">' + p + '</p>').join('') + (o.html || '') +\n  (o.buttons || []).map((b, i) => '<a href=\"' + b.url + '\" style=\"display:block;margin:' + (i ? 10 : 22) + 'px 0 0;padding:15px;border-radius:999px;text-align:center;text-decoration:none;font:700 15px Arial;' +\n    (i ? 'border:2px solid #17181B;color:#17181B' : 'background:#D9A441;color:#17181B') + '\">' + b.text + ' &rarr;</a>').join('') +\n  '</td></tr>' + (o.footer ? '<tr><td style=\"padding:18px 30px 0;font:12px/1.6 Arial;color:#6B6862;text-align:center\">' + o.footer + '</td></tr>' : '') + '</table></div>';\nconst NEXT = {\"research\": [\"Put Your Research To Work\", \"Research that never reaches a campaign brief ends up in a folder nobody opens.\", \"demand-generation-support/\", \"Read The Demand Generation Module\"], \"positioning\": [\"Keep Your Positioning Intact At Launch\", \"Positioning drifts the moment five people write launch assets from five different briefs.\", \"launch-content-kit/\", \"Read The Launch Content Module\"], \"launch\": [\"Set The Targets Before Launch Day\", \"A launch without agreed targets turns the 90-day review into a debate about what success meant.\", \"performance-and-optimisation/\", \"Read The Performance Module\"], \"sales\": [\"See The Sales Deck Filled In\", \"Reps struggle to picture a deck outline until they see one filled in for a worked example.\", \"templates/sample-sales-deck.pdf\", \"View The Sample Sales Deck\"], \"none\": [\"Start With The Module Closest To Your Launch\", \"A busy week can push a five-lesson course to the bottom of the inbox.\", \"\", \"Open The Playbook\"]};\nconst base = 'https://archanacontent.github.io/b2b-saas/', out = [];\nfor (const i of $input.all()) { const s = i.json;\n  if (s.Status !== 'active' || Number(s['Course step']) !== 5 || new Date(s['Next send']) > new Date()) continue;\n  const n = NEXT[s.Interest] || NEXT.none;\n  out.push({ json: { ID: s.ID, 'Course step': 6, 'Next send': '', _to: s.Email, _subject: n[0], _html: brand({ owner: cfg.ownerName, label: 'Your Next Step', title: n[0], hook: n[1],\n    buttons: [{ text: n[3], url: link({ a: 'c', id: s.ID, m: 'next-best', t: s.Interest || 'none', u: base + n[2] }) }], footer: '<a href=\"' + link({ a: 'unsub', id: s.ID }) + '\">Unsubscribe in one click</a>' }) } }); }\nreturn out;"
+      },
+      "id": "7614e7ab-df04-565e-91cd-71ea25832004",
+      "name": "Pick Next-Best",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        720,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json._to }}",
+        "subject": "={{ $json._subject }}",
+        "emailType": "html",
+        "message": "={{ $json._html }}",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "id": "5e2a8204-35bc-51ab-a43f-4fd2269f20c3",
+      "name": "Send Next-Best",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        960,
+        300
+      ],
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "",
+          "name": "gmailOAuth2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "return $('Pick Next-Best').all().map(i => ({ json: { ID: i.json.ID, 'Course step': 6, 'Next send': '' } }));"
+      },
+      "id": "ada5f401-2560-5407-880d-8a3a0b7b079d",
+      "name": "Progress Rows",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1200,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "mode": "url",
+          "value": "={{ $('Config').first().json.sheetUrl }}"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Subscribers"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {},
+          "matchingColumns": [
+            "ID"
+          ]
+        },
+        "options": {}
+      },
+      "id": "2ab79536-c109-51aa-856d-77632d133e5e",
+      "name": "Save Progress",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        1440,
+        300
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "",
+          "name": "googleSheetsOAuth2Api"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Every Hour": {
+      "main": [
+        [
+          {
+            "node": "Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Config": {
+      "main": [
+        [
+          {
+            "node": "Read Subscribers",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Subscribers": {
+      "main": [
+        [
+          {
+            "node": "Pick Next-Best",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pick Next-Best": {
+      "main": [
+        [
+          {
+            "node": "Send Next-Best",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Next-Best": {
+      "main": [
+        [
+          {
+            "node": "Progress Rows",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Progress Rows": {
+      "main": [
+        [
+          {
+            "node": "Save Progress",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": false
+  }
+}

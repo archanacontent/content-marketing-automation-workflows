@@ -1,0 +1,209 @@
+{
+  "name": "13 | New Content Broadcast",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## New Content Broadcast\nWhen a new repository appears in your GitHub feed, Gemini drafts a 50 to 60 word email for subscribers interested in that topic. The draft waits in the Queue tab and only sends after you tick Approved.",
+        "height": 220,
+        "width": 520
+      },
+      "id": "895a7d8a-6e19-58be-abeb-e796f623210c",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        0,
+        20
+      ]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "days",
+              "triggerAtHour": 7
+            }
+          ]
+        }
+      },
+      "id": "7af65b3d-26ff-5a51-b81a-07dcf45783a7",
+      "name": "Every Morning",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{ json: {\n  sheetUrl: 'YOUR_CONTROL_SHEET_URL',\n  ownerEmail: 'YOUR_EMAIL',\n  ownerName: 'YOUR_NAME',\n  ga4PropertyId: 'YOUR_GA4_PROPERTY_ID',\n  siteUrl: 'https://YOUR_SITE/',\n  githubOwner: 'YOUR_GITHUB_USERNAME',\n  guideSites: ['https://YOUR_SITE/guide-one/', 'https://YOUR_SITE/guide-two/'],\n  pagesUrl: 'https://YOUR_SITE/your-repo/',\n  geminiModel: 'gemini-flash-latest',\n  linkSecret: 'REPLACE_WITH_A_LONG_RANDOM_STRING'\n} }];"
+      },
+      "id": "f9ce1d5d-fd93-56c0-bff6-dd0c4a543396",
+      "name": "Config",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        240,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const cfg = $('Config').first().json, store = $getWorkflowStaticData('global');\nconst feed = String(await this.helpers.httpRequest({ url: 'https://github.com/' + cfg.githubOwner + '.atom' }));\nconst names = [...new Set([...feed.matchAll(/created a repository [^/<\\s]+\\/([A-Za-z0-9._-]+)/g)].map(m => m[1]))];\nconst known = store.known; store.known = [...new Set([...(known || []), ...names])];\nif (!known) return [];\nreturn names.filter(n => !known.includes(n)).map(n => ({ json: { url: cfg.siteUrl + n + '/', name: n } }));"
+      },
+      "id": "f7fbf626-fef7-5474-9399-9a0d44e89503",
+      "name": "Detect New Repository",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        480,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://generativelanguage.googleapis.com/v1beta/models/{{ $('Config').first().json.geminiModel }}:generateContent",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ contents: [{ role: 'user', parts: [{ text: 'Write in plain, professional English for B2B readers. Title Case for headings and subjects. Lead with the reader problem. No em dashes, semicolons, exclamation marks, emojis or hype words. Do not start sentences with This, These or That. Never invent numbers, quotes or results. Write a 50 to 60 word email telling launch-course subscribers about this new piece, opening with one pain-point hook sentence. Return JSON {subject (Title Case), body}. Piece: ' + $json.url }] }], generationConfig: { temperature: 0.3, responseMimeType: 'application/json' } }) }}",
+        "options": {
+          "retry": {
+            "maxTries": 3,
+            "waitBetweenTries": 3000
+          }
+        }
+      },
+      "id": "2c705985-b210-517a-8c9b-9cab1802feb9",
+      "name": "Draft Broadcast",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        720,
+        300
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "",
+          "name": "httpHeaderAuth"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "return $input.all().map((i, n) => { const o = JSON.parse(i.json.candidates[0].content.parts[0].text), src = $('Detect New Repository').all()[n].json;\n  return { json: { ID: 'q' + Date.now() + n, Created: new Date().toISOString(), Workflow: 'New content broadcast', Kind: 'broadcast', Target: JSON.stringify({ url: src.url, topic: 'none' }), Subject: o.subject, Draft: o.body, Status: 'awaiting approval', Approved: false } }; });"
+      },
+      "id": "5e1fe326-ee52-50f7-a633-73629cad1b95",
+      "name": "Queue Row",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        960,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "mode": "url",
+          "value": "={{ $('Config').first().json.sheetUrl }}"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Queue"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {},
+          "matchingColumns": []
+        },
+        "options": {}
+      },
+      "id": "b3c14b43-7ee1-50a0-a58a-c82dc82a47c9",
+      "name": "Add To Queue",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        1200,
+        300
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "",
+          "name": "googleSheetsOAuth2Api"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Every Morning": {
+      "main": [
+        [
+          {
+            "node": "Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Config": {
+      "main": [
+        [
+          {
+            "node": "Detect New Repository",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Detect New Repository": {
+      "main": [
+        [
+          {
+            "node": "Draft Broadcast",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Draft Broadcast": {
+      "main": [
+        [
+          {
+            "node": "Queue Row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Queue Row": {
+      "main": [
+        [
+          {
+            "node": "Add To Queue",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": false
+  }
+}

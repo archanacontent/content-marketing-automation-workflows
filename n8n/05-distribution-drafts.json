@@ -1,0 +1,254 @@
+{
+  "name": "05 | Distribution Drafts",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## Distribution Drafts\nTurns a new piece into a LinkedIn post and a Reddit discussion post. Drafts land in the Queue tab and your inbox. Nothing is posted automatically.",
+        "height": 220,
+        "width": 520
+      },
+      "id": "9e2b9783-84bd-5a91-9580-1f97b29aa682",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        0,
+        20
+      ]
+    },
+    {
+      "parameters": {
+        "formTitle": "Distribution Drafts",
+        "formDescription": "Paste the URL of the published piece.",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "Page URL",
+              "requiredField": true
+            }
+          ]
+        },
+        "options": {
+          "respondWithOptions": {
+            "values": {
+              "formSubmittedText": "Thanks. A confirmation is on its way to your inbox."
+            }
+          }
+        }
+      },
+      "id": "c16d091a-4fca-5e4e-8c32-1f7d9ccdd845",
+      "name": "New Piece Form",
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.2,
+      "position": [
+        0,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{ json: {\n  sheetUrl: 'YOUR_CONTROL_SHEET_URL',\n  ownerEmail: 'YOUR_EMAIL',\n  ownerName: 'YOUR_NAME',\n  ga4PropertyId: 'YOUR_GA4_PROPERTY_ID',\n  siteUrl: 'https://YOUR_SITE/',\n  githubOwner: 'YOUR_GITHUB_USERNAME',\n  guideSites: ['https://YOUR_SITE/guide-one/', 'https://YOUR_SITE/guide-two/'],\n  pagesUrl: 'https://YOUR_SITE/your-repo/',\n  geminiModel: 'gemini-flash-latest',\n  linkSecret: 'REPLACE_WITH_A_LONG_RANDOM_STRING'\n} }];"
+      },
+      "id": "d5cd0418-c2c7-5535-869d-2df54fcdaaa5",
+      "name": "Config",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        240,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const url = $('New Piece Form').first().json['Page URL'];\nconst html = String(await this.helpers.httpRequest({ url }));\nreturn [{ json: { url, title: (html.match(/<title>([^<]+)<\\/title>/i) || [, ''])[1], text: html.replace(/<script[\\s\\S]*?<\\/script>|<style[\\s\\S]*?<\\/style>/gi, ' ').replace(/<[^>]+>/g, ' ').replace(/\\s+/g, ' ').slice(0, 6000) } }];"
+      },
+      "id": "425c7374-37e1-5338-9c87-1b2c7c32e77c",
+      "name": "Fetch Page",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        480,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://generativelanguage.googleapis.com/v1beta/models/{{ $('Config').first().json.geminiModel }}:generateContent",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ contents: [{ role: 'user', parts: [{ text: 'Write in plain, professional English for B2B readers. Title Case for headings and subjects. Lead with the reader problem. No em dashes, semicolons, exclamation marks, emojis or hype words. Do not start sentences with This, These or That. Never invent numbers, quotes or results. Draft posts announcing this piece. Return JSON {linkedin (120 to 180 words, no hashtags, link on its own final line), reddit_title (Title Case, under 90 characters, a discussion question), reddit_body (100 to 150 words, discussion starter, link once at the end)}. Piece: ' + JSON.stringify($json) }] }], generationConfig: { temperature: 0.3, responseMimeType: 'application/json' } }) }}",
+        "options": {
+          "retry": {
+            "maxTries": 3,
+            "waitBetweenTries": 3000
+          }
+        }
+      },
+      "id": "f8ac7807-c698-5b4e-87cf-84e7023bf8ae",
+      "name": "Draft Posts",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        720,
+        300
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "",
+          "name": "httpHeaderAuth"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const o = JSON.parse($json.candidates[0].content.parts[0].text), pg = $('Fetch Page').first().json;\nconst draft = 'LINKEDIN\\n\\n' + o.linkedin + '\\n\\n---\\n\\nREDDIT TITLE\\n' + o.reddit_title + '\\n\\nREDDIT BODY\\n' + o.reddit_body;\nreturn [{ json: { ID: 'q' + Date.now(), Created: new Date().toISOString(), Workflow: 'Distribution drafts', Kind: 'social', Target: pg.url, Subject: 'Posts For ' + pg.title, Draft: draft, Status: 'for review' } }];"
+      },
+      "id": "f6357fee-d184-58f1-bc42-95b365cc5faf",
+      "name": "Prepare Drafts",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        960,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "mode": "url",
+          "value": "={{ $('Config').first().json.sheetUrl }}"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Queue"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {},
+          "matchingColumns": []
+        },
+        "options": {}
+      },
+      "id": "62063d25-667b-5520-b6e8-bf4504ded0e4",
+      "name": "Add To Queue",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        1200,
+        300
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "",
+          "name": "googleSheetsOAuth2Api"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $('Config').first().json.ownerEmail }}",
+        "subject": "=[Automation] {{ $('Prepare Drafts').first().json.Subject }}",
+        "emailType": "html",
+        "message": "=<pre style=\"white-space:pre-wrap;font-family:Arial\">{{ $('Prepare Drafts').first().json.Draft }}</pre>",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "id": "052856e2-4f74-5f1c-98cb-d4a236688027",
+      "name": "Email The Drafts",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        1440,
+        300
+      ],
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "",
+          "name": "gmailOAuth2"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "New Piece Form": {
+      "main": [
+        [
+          {
+            "node": "Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Config": {
+      "main": [
+        [
+          {
+            "node": "Fetch Page",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Page": {
+      "main": [
+        [
+          {
+            "node": "Draft Posts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Draft Posts": {
+      "main": [
+        [
+          {
+            "node": "Prepare Drafts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Drafts": {
+      "main": [
+        [
+          {
+            "node": "Add To Queue",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Add To Queue": {
+      "main": [
+        [
+          {
+            "node": "Email The Drafts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": false
+  }
+}

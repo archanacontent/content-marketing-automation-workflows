@@ -1,0 +1,301 @@
+{
+  "name": "07 | Welcome Email On Confirmation",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## Welcome Email On Confirmation\nThe public link page calls this webhook when a subscriber taps Confirm My Email. The signature is checked, the subscriber is activated and Lesson 1 goes out at once.",
+        "height": 220,
+        "width": 520
+      },
+      "id": "ad9245a9-ab9f-5188-9e8d-bda2d4d5b14d",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        0,
+        20
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "GET",
+        "path": "cma-link",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "4ca544cf-740b-56c2-87ee-f5c435445e68",
+      "name": "Link Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{ json: {\n  sheetUrl: 'YOUR_CONTROL_SHEET_URL',\n  ownerEmail: 'YOUR_EMAIL',\n  ownerName: 'YOUR_NAME',\n  ga4PropertyId: 'YOUR_GA4_PROPERTY_ID',\n  siteUrl: 'https://YOUR_SITE/',\n  githubOwner: 'YOUR_GITHUB_USERNAME',\n  guideSites: ['https://YOUR_SITE/guide-one/', 'https://YOUR_SITE/guide-two/'],\n  pagesUrl: 'https://YOUR_SITE/your-repo/',\n  geminiModel: 'gemini-flash-latest',\n  linkSecret: 'REPLACE_WITH_A_LONG_RANDOM_STRING'\n} }];"
+      },
+      "id": "30ea7a7b-c094-5077-bc23-1fc5133f9f75",
+      "name": "Config",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        240,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const cfg = $('Config').first().json;\nconst crypto = require('crypto');\nconst sign = (q, secret) => crypto.createHmac('sha256', secret).update(q).digest('base64url').slice(0, 16);\nconst link = (params) => { const q = Object.entries(params).map(([k, v]) => k + '=' + encodeURIComponent(v)).join('&');\n  return cfg.pagesUrl + 'go/?' + q + '&s=' + sign(q, cfg.linkSecret); };\nconst q = $('Link Webhook').first().json.query; const { s, format, ...rest } = q;\nconst ok = s && s === sign(Object.entries(rest).map(([k, v]) => k + '=' + encodeURIComponent(v)).join('&'), cfg.linkSecret);\nreturn [{ json: { ok, ...rest } }];"
+      },
+      "id": "f59a4e59-57ba-5ae0-8326-124ec7dcf340",
+      "name": "Verify Signature",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        480,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "read",
+        "documentId": {
+          "__rl": true,
+          "mode": "url",
+          "value": "={{ $('Config').first().json.sheetUrl }}"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Subscribers"
+        },
+        "options": {}
+      },
+      "id": "bc72ab1c-6755-56cf-a7da-99a1cd21aa6e",
+      "name": "Read Subscribers",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        720,
+        300
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "",
+          "name": "googleSheetsOAuth2Api"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const cfg = $('Config').first().json;\nconst crypto = require('crypto');\nconst sign = (q, secret) => crypto.createHmac('sha256', secret).update(q).digest('base64url').slice(0, 16);\nconst link = (params) => { const q = Object.entries(params).map(([k, v]) => k + '=' + encodeURIComponent(v)).join('&');\n  return cfg.pagesUrl + 'go/?' + q + '&s=' + sign(q, cfg.linkSecret); };const brand = (o) => '<div style=\"background:#EFEBE3;padding:24px 10px\"><table role=\"presentation\" width=\"100%\" style=\"max-width:580px;margin:0 auto\">' +\n  '<tr><td style=\"background:#131416;padding:30px;border-radius:14px 14px 0 0\"><div style=\"font:700 11px Arial;letter-spacing:.18em;color:#D9A441\">' + o.owner.toUpperCase() + '</div>' +\n  (o.label ? '<div style=\"margin-top:14px;display:inline-block;border:1px solid #3A3B40;border-radius:999px;padding:5px 12px;font:600 12px Arial;color:#C9C4BA\">' + o.label + '</div>' : '') +\n  '<h1 style=\"margin:16px 0 0;font:800 26px/1.22 Arial;color:#F4F0E8\">' + o.title + '</h1></td></tr>' +\n  '<tr><td style=\"background:#fff;padding:30px;border-radius:0 0 14px 14px\">' +\n  (o.hook ? '<p style=\"margin:0 0 16px;font:600 18px/1.5 Arial;color:#17181B;border-left:3px solid #D9A441;padding-left:14px\">' + o.hook + '</p>' : '') +\n  (o.paras || []).map(p => '<p style=\"margin:0 0 14px;font:15.5px/1.65 Arial;color:#2B2C30\">' + p + '</p>').join('') + (o.html || '') +\n  (o.buttons || []).map((b, i) => '<a href=\"' + b.url + '\" style=\"display:block;margin:' + (i ? 10 : 22) + 'px 0 0;padding:15px;border-radius:999px;text-align:center;text-decoration:none;font:700 15px Arial;' +\n    (i ? 'border:2px solid #17181B;color:#17181B' : 'background:#D9A441;color:#17181B') + '\">' + b.text + ' &rarr;</a>').join('') +\n  '</td></tr>' + (o.footer ? '<tr><td style=\"padding:18px 30px 0;font:12px/1.6 Arial;color:#6B6862;text-align:center\">' + o.footer + '</td></tr>' : '') + '</table></div>';\nconst p = $('Verify Signature').first().json; if (!p.ok || p.a !== 'confirm') return [];\nconst sub = $input.all().map(i => i.json).find(r => r.ID === p.id); if (!sub) return [];\nconst L = { label: 'Welcome | Lesson 1 Of 5', title: 'Prove The Demand Before You Plan The Launch', hook: 'Most stalled launches were planned around a problem nobody measured.',\n  paras: ['Before you write a positioning line, find out how many companies feel the pain and what their current workaround costs them. The research module gives you a weighted scorecard, so the go or no-go call rests on evidence instead of instinct.'],\n  links: [['Read The Research Module', 'market-research/', 'research'], ['Download The Launch Workbook', 'templates/launch-playbook-workbook.xlsx', 'launch']] };\nconst base = 'https://archanacontent.github.io/b2b-saas/';\nreturn [{ json: { ID: sub.ID, Status: 'active', Confirmed: new Date().toISOString(), 'Course step': 1, 'Next send': new Date(Date.now() + 48 * 36e5).toISOString(),\n  _to: sub.Email, _subject: 'Lesson 1: ' + L.title, _html: brand({ owner: cfg.ownerName, label: L.label, title: L.title, hook: L.hook, paras: L.paras,\n  buttons: L.links.map(l => ({ text: l[0], url: link({ a: 'c', id: sub.ID, m: 'lesson-1', t: l[2], u: base + l[1] }) })),\n  footer: 'You are receiving this because you signed up for the launch course. <a href=\"' + link({ a: 'unsub', id: sub.ID }) + '\">Unsubscribe in one click</a>' }) } }];"
+      },
+      "id": "7ecd20c3-c9bd-5d82-8be2-0dc086e205ee",
+      "name": "Activate And Build Lesson 1",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        960,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "mode": "url",
+          "value": "={{ $('Config').first().json.sheetUrl }}"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Subscribers"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {},
+          "matchingColumns": [
+            "ID"
+          ]
+        },
+        "options": {}
+      },
+      "id": "f5282c0e-6df8-5dad-9492-282f7820f4c3",
+      "name": "Update Subscriber",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        1200,
+        300
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "",
+          "name": "googleSheetsOAuth2Api"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $('Activate And Build Lesson 1').first().json._to }}",
+        "subject": "={{ $('Activate And Build Lesson 1').first().json._subject }}",
+        "emailType": "html",
+        "message": "={{ $('Activate And Build Lesson 1').first().json._html }}",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "id": "c4f1a4c7-687a-59f8-a725-2d1e27377ca7",
+      "name": "Send Lesson 1",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        1440,
+        300
+      ],
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "",
+          "name": "gmailOAuth2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{ json: { title: 'You Are In', text: 'Lesson 1 is on its way to your inbox.' } }];"
+      },
+      "id": "2f61e696-19d2-514b-b370-e23380857c29",
+      "name": "Reply Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1680,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json) }}",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              }
+            ]
+          }
+        }
+      },
+      "id": "bd66c5a2-8426-5df5-a68d-3de87245940a",
+      "name": "Respond",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        1920,
+        300
+      ]
+    }
+  ],
+  "connections": {
+    "Link Webhook": {
+      "main": [
+        [
+          {
+            "node": "Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Config": {
+      "main": [
+        [
+          {
+            "node": "Verify Signature",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verify Signature": {
+      "main": [
+        [
+          {
+            "node": "Read Subscribers",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Subscribers": {
+      "main": [
+        [
+          {
+            "node": "Activate And Build Lesson 1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Activate And Build Lesson 1": {
+      "main": [
+        [
+          {
+            "node": "Update Subscriber",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Subscriber": {
+      "main": [
+        [
+          {
+            "node": "Send Lesson 1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Lesson 1": {
+      "main": [
+        [
+          {
+            "node": "Reply Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Reply Data": {
+      "main": [
+        [
+          {
+            "node": "Respond",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": false
+  }
+}

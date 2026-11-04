@@ -1,0 +1,246 @@
+{
+  "name": "01 | Source Change Watch",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## Source Change Watch\nReads the Sources tab, fetches each official source, compares the value with the last one stored, updates the tab and emails the guides affected by any change.",
+        "height": 220,
+        "width": 520
+      },
+      "id": "d208a3ec-9d77-53b0-91d7-7b730227a791",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        0,
+        20
+      ]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "days",
+              "triggerAtHour": 7
+            }
+          ]
+        }
+      },
+      "id": "35641d91-e717-5c02-87bf-bedce860641c",
+      "name": "Every Morning At 7",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{ json: {\n  sheetUrl: 'YOUR_CONTROL_SHEET_URL',\n  ownerEmail: 'YOUR_EMAIL',\n  ownerName: 'YOUR_NAME',\n  ga4PropertyId: 'YOUR_GA4_PROPERTY_ID',\n  siteUrl: 'https://YOUR_SITE/',\n  githubOwner: 'YOUR_GITHUB_USERNAME',\n  guideSites: ['https://YOUR_SITE/guide-one/', 'https://YOUR_SITE/guide-two/'],\n  pagesUrl: 'https://YOUR_SITE/your-repo/',\n  geminiModel: 'gemini-flash-latest',\n  linkSecret: 'REPLACE_WITH_A_LONG_RANDOM_STRING'\n} }];"
+      },
+      "id": "94141794-17e4-5d42-8840-eba08038c229",
+      "name": "Config",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        240,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "read",
+        "documentId": {
+          "__rl": true,
+          "mode": "url",
+          "value": "={{ $('Config').first().json.sheetUrl }}"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Sources"
+        },
+        "options": {}
+      },
+      "id": "e4032a87-08eb-5dd0-8bd8-aa5620102e30",
+      "name": "Read Sources",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        480,
+        300
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "",
+          "name": "googleSheetsOAuth2Api"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const pick = (o, p) => p.split('.').reduce((a, k) => a == null ? a : a[k], o);\nconst out = [];\nfor (const item of $input.all()) {\n  const s = item.json; let now;\n  try {\n    if (s.Kind === 'json') now = String(pick(await this.helpers.httpRequest({ url: s.Target, json: true }), s.Pattern));\n    else { const t = await this.helpers.httpRequest({ url: s.Target }); now = String(t).includes(s.Pattern) ? 'listed' : 'not listed'; }\n  } catch (e) { out.push({ json: { ID: s.ID, 'Last checked': new Date().toISOString(), Status: 'error: ' + e.message.slice(0, 100) } }); continue; }\n  const changed = s['Last value'] && String(s['Last value']) !== now;\n  out.push({ json: { ID: s.ID, 'Last value': now, 'Last checked': new Date().toISOString(), Status: changed ? 'changed' : 'ok', ...(changed ? { 'Last changed': new Date().toISOString() } : {}),\n    _change: changed ? { name: s.Name, was: s['Last value'], now, guides: s['Guides affected'], url: s.Target } : null } });\n}\nreturn out;"
+      },
+      "id": "adfa90a6-4625-563b-877d-3e853d143072",
+      "name": "Fetch And Compare",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        720,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "mode": "url",
+          "value": "={{ $('Config').first().json.sheetUrl }}"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Sources"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {},
+          "matchingColumns": [
+            "ID"
+          ]
+        },
+        "options": {}
+      },
+      "id": "987886fc-98f7-5b92-a0b1-6569ff340cca",
+      "name": "Update Sources",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        960,
+        300
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "",
+          "name": "googleSheetsOAuth2Api"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const cfg = $('Config').first().json;\nconst brand = (o) => '<div style=\"background:#EFEBE3;padding:24px 10px\"><table role=\"presentation\" width=\"100%\" style=\"max-width:580px;margin:0 auto\">' +\n  '<tr><td style=\"background:#131416;padding:30px;border-radius:14px 14px 0 0\"><div style=\"font:700 11px Arial;letter-spacing:.18em;color:#D9A441\">' + o.owner.toUpperCase() + '</div>' +\n  (o.label ? '<div style=\"margin-top:14px;display:inline-block;border:1px solid #3A3B40;border-radius:999px;padding:5px 12px;font:600 12px Arial;color:#C9C4BA\">' + o.label + '</div>' : '') +\n  '<h1 style=\"margin:16px 0 0;font:800 26px/1.22 Arial;color:#F4F0E8\">' + o.title + '</h1></td></tr>' +\n  '<tr><td style=\"background:#fff;padding:30px;border-radius:0 0 14px 14px\">' +\n  (o.hook ? '<p style=\"margin:0 0 16px;font:600 18px/1.5 Arial;color:#17181B;border-left:3px solid #D9A441;padding-left:14px\">' + o.hook + '</p>' : '') +\n  (o.paras || []).map(p => '<p style=\"margin:0 0 14px;font:15.5px/1.65 Arial;color:#2B2C30\">' + p + '</p>').join('') + (o.html || '') +\n  (o.buttons || []).map((b, i) => '<a href=\"' + b.url + '\" style=\"display:block;margin:' + (i ? 10 : 22) + 'px 0 0;padding:15px;border-radius:999px;text-align:center;text-decoration:none;font:700 15px Arial;' +\n    (i ? 'border:2px solid #17181B;color:#17181B' : 'background:#D9A441;color:#17181B') + '\">' + b.text + ' &rarr;</a>').join('') +\n  '</td></tr>' + (o.footer ? '<tr><td style=\"padding:18px 30px 0;font:12px/1.6 Arial;color:#6B6862;text-align:center\">' + o.footer + '</td></tr>' : '') + '</table></div>';\nconst ch = $('Fetch And Compare').all().map(i => i.json._change).filter(Boolean);\nif (!ch.length) return [];\nconst list = '<ul>' + ch.map(c => '<li><b>' + c.name + '</b>: ' + c.was + ' &rarr; ' + c.now + '<br>Guides to check: ' + c.guides + '</li>').join('') + '</ul>';\nreturn [{ json: { subject: '[Automation] ' + ch.length + ' Source Change(s) Affect Your Guides', html: brand({ owner: cfg.ownerName, label: 'Workflow 1', title: 'Source Change Alert', paras: ['A source your guides depend on has changed. Review the affected pages before readers notice.'], html: list }) } }];"
+      },
+      "id": "243f897d-d04f-5569-902b-c5f1db627b32",
+      "name": "Build Alert",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1200,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $('Config').first().json.ownerEmail }}",
+        "subject": "={{ $json.subject }}",
+        "emailType": "html",
+        "message": "={{ $json.html }}",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "id": "348bb92b-6a49-5b09-b2a6-9e1f4490118f",
+      "name": "Email The Alert",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        1440,
+        300
+      ],
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "",
+          "name": "gmailOAuth2"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Every Morning At 7": {
+      "main": [
+        [
+          {
+            "node": "Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Config": {
+      "main": [
+        [
+          {
+            "node": "Read Sources",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Sources": {
+      "main": [
+        [
+          {
+            "node": "Fetch And Compare",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch And Compare": {
+      "main": [
+        [
+          {
+            "node": "Update Sources",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Sources": {
+      "main": [
+        [
+          {
+            "node": "Build Alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Alert": {
+      "main": [
+        [
+          {
+            "node": "Email The Alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": false
+  }
+}

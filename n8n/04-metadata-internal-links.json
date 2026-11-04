@@ -1,0 +1,218 @@
+{
+  "name": "04 | Metadata And Internal Links",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## Metadata And Internal Links\nSubmit a page URL. Gemini suggests an SEO title, a meta description, alt text for images without it and up to three internal links. Suggestions go to the Queue tab for review.",
+        "height": 220,
+        "width": 520
+      },
+      "id": "fef9ef92-5e7d-58a5-999c-80219209c2e2",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        0,
+        20
+      ]
+    },
+    {
+      "parameters": {
+        "formTitle": "Metadata And Internal Links",
+        "formDescription": "Paste the page to review.",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "Page URL",
+              "requiredField": true
+            }
+          ]
+        },
+        "options": {
+          "respondWithOptions": {
+            "values": {
+              "formSubmittedText": "Thanks. A confirmation is on its way to your inbox."
+            }
+          }
+        }
+      },
+      "id": "9be5e8d2-0fdd-50fd-adf8-eccc6f1317d6",
+      "name": "Page URL Form",
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.2,
+      "position": [
+        0,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{ json: {\n  sheetUrl: 'YOUR_CONTROL_SHEET_URL',\n  ownerEmail: 'YOUR_EMAIL',\n  ownerName: 'YOUR_NAME',\n  ga4PropertyId: 'YOUR_GA4_PROPERTY_ID',\n  siteUrl: 'https://YOUR_SITE/',\n  githubOwner: 'YOUR_GITHUB_USERNAME',\n  guideSites: ['https://YOUR_SITE/guide-one/', 'https://YOUR_SITE/guide-two/'],\n  pagesUrl: 'https://YOUR_SITE/your-repo/',\n  geminiModel: 'gemini-flash-latest',\n  linkSecret: 'REPLACE_WITH_A_LONG_RANDOM_STRING'\n} }];"
+      },
+      "id": "a9532fd2-c63a-5ba7-8cbf-7d1d52526d19",
+      "name": "Config",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        240,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const url = $('Page URL Form').first().json['Page URL'];\nconst html = String(await this.helpers.httpRequest({ url }));\nconst pick = re => (html.match(re) || [, ''])[1].replace(/\\s+/g, ' ').trim();\nreturn [{ json: { url, title: pick(/<title>([^<]+)<\\/title>/i), description: pick(/<meta name=\"description\" content=\"([^\"]+)\"/i),\n  images: (html.match(/<img(?![^>]*\\balt=)[^>]*src=\"([^\"]+)\"/gi) || []).slice(0, 10),\n  text: html.replace(/<script[\\s\\S]*?<\\/script>|<style[\\s\\S]*?<\\/style>/gi, ' ').replace(/<[^>]+>/g, ' ').replace(/\\s+/g, ' ').slice(0, 6000) } }];"
+      },
+      "id": "f0c0a3ea-b379-5a01-b9a3-98d3445cb621",
+      "name": "Fetch Page",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        480,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://generativelanguage.googleapis.com/v1beta/models/{{ $('Config').first().json.geminiModel }}:generateContent",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ contents: [{ role: 'user', parts: [{ text: 'Write in plain, professional English for B2B readers. Title Case for headings and subjects. Lead with the reader problem. No em dashes, semicolons, exclamation marks, emojis or hype words. Do not start sentences with This, These or That. Never invent numbers, quotes or results. Suggest SEO metadata. Return JSON {seo_title (under 60 characters), meta_description (140 to 155 characters), alt_text: [{src, alt}], internal_links: [{anchor_text, target_url, reason}] chosen only from: ' + $('Config').first().json.guideSites.join(', ') + '}. Page: ' + JSON.stringify($json) }] }], generationConfig: { temperature: 0.3, responseMimeType: 'application/json' } }) }}",
+        "options": {
+          "retry": {
+            "maxTries": 3,
+            "waitBetweenTries": 3000
+          }
+        }
+      },
+      "id": "5393e80a-d59d-5901-bf27-5d193b79167a",
+      "name": "Ask Gemini",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        720,
+        300
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "",
+          "name": "httpHeaderAuth"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const o = JSON.parse($json.candidates[0].content.parts[0].text), pg = $('Fetch Page').first().json;\nconst draft = 'SEO title: ' + o.seo_title + '\\n\\nMeta description: ' + o.meta_description + '\\n\\nAlt text:\\n' + (o.alt_text || []).map(a => '- ' + a.src + ': ' + a.alt).join('\\n') + '\\n\\nInternal links:\\n' + (o.internal_links || []).map(l => '- ' + l.anchor_text + ' to ' + l.target_url).join('\\n');\nreturn [{ json: { ID: 'q' + Date.now(), Created: new Date().toISOString(), Workflow: 'Metadata and internal links', Kind: 'metadata', Target: pg.url, Subject: 'Metadata For ' + pg.title, Draft: draft, Status: 'for review' } }];"
+      },
+      "id": "bd51ff55-bb85-5e18-a0c8-031b065e18d6",
+      "name": "Prepare Queue Row",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        960,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "mode": "url",
+          "value": "={{ $('Config').first().json.sheetUrl }}"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Queue"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {},
+          "matchingColumns": []
+        },
+        "options": {}
+      },
+      "id": "8566ac29-cb8e-52bb-9e1c-3ae427c3f73d",
+      "name": "Add To Queue",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        1200,
+        300
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "",
+          "name": "googleSheetsOAuth2Api"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Page URL Form": {
+      "main": [
+        [
+          {
+            "node": "Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Config": {
+      "main": [
+        [
+          {
+            "node": "Fetch Page",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Page": {
+      "main": [
+        [
+          {
+            "node": "Ask Gemini",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ask Gemini": {
+      "main": [
+        [
+          {
+            "node": "Prepare Queue Row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Queue Row": {
+      "main": [
+        [
+          {
+            "node": "Add To Queue",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": false
+  }
+}
