@@ -103,7 +103,7 @@ function verify_(e) {
   return p.s && p.s === sign_(q);
 }
 
-function esc_(s) { return String(s || '').replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+function esc_(s) { return String(s === undefined || s === null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
 
 function fetchJson_(url, opts) {
   var res = UrlFetchApp.fetch(url, Object.assign({ muteHttpExceptions: true }, opts || {}));
@@ -249,6 +249,7 @@ var WRITING_RULES = [
   'Do not start sentences with This, These or That.',
   'Avoid hype words: unlock, leverage, seamless, game-changer, cutting-edge, robust, elevate, delve, harness, streamline.',
   'Vary sentence length. Keep every sentence under 35 words.',
+  'Write numbers as numerals, never as words.',
   'Never invent numbers, quotes or results. Use only facts given in the input.'
 ].join('\n');
 
@@ -1086,7 +1087,9 @@ function checkPage_(p) {
 function brokenLinks_(pages) {
   var links = {};
   pages.forEach(function (p) {
-    (p.html.match(/href="(https?:[^"#]+|[^"#:]+)"/g) || []).forEach(function (h) {
+    /* Only real links count: preconnect and stylesheet hints point at hosts, not pages. */
+    var body = p.html.replace(/<link\b[^>]*>/gi, '');
+    (body.match(/href="(https?:[^"#]+|[^"#:]+)"/g) || []).forEach(function (h) {
       var u = absolute_(h.slice(6, -1), p.url);
       if (u && /^https/.test(u)) (links[u] = links[u] || []).push(p.url);
     });
@@ -1274,22 +1277,33 @@ function weeklyReport_() {
 function emailStats_() {
   var ev = rows_('Events'), msgs = {};
   ev.forEach(function (e) {
-    if (e.Type !== 'sent' && e.Type !== 'click') return;
-    var m = e.Message || e.Campaign; if (!m) return;
+    /* Confirming a sign-up is the click on the confirmation email. */
+    var type = e.Type === 'confirmed' ? 'click' : e.Type;
+    if (type !== 'sent' && type !== 'click') return;
+    var m = e.Type === 'confirmed' ? 'confirmation' : (e.Message || e.Campaign); if (!m) return;
+    if (e.Campaign === 'confirmation' && e.Type === 'sent') m = 'confirmation';
     msgs[m] = msgs[m] || { sent: {}, clicked: {} };
-    if (e.Type === 'sent') msgs[m].sent[e['Subscriber ID']] = 1; else msgs[m].clicked[e['Subscriber ID']] = 1;
+    if (type === 'sent') msgs[m].sent[e['Subscriber ID']] = 1; else msgs[m].clicked[e['Subscriber ID']] = 1;
   });
   return Object.keys(msgs).map(function (m) {
     var s = Object.keys(msgs[m].sent).length, c = Object.keys(msgs[m].clicked).length;
-    return { message: m, sent: s, clicked: c, rate: s ? Math.round(c / s * 100) : 0 };
+    return { message: label_(m), sent: s, clicked: c, rate: s ? Math.round(c / s * 100) : 0 };
   }).filter(function (x) { return x.sent; });
+}
+
+function label_(m) {
+  var names = { confirmation: 'Confirmation', reengage: 'Re-Engagement' };
+  if (names[m]) return names[m];
+  var l = String(m).match(/^lesson-(\d)$/); if (l) return 'Lesson ' + l[1];
+  var n = String(m).match(/^next-best-(\w+)$/); if (n) return 'Next-Best (' + n[1].charAt(0).toUpperCase() + n[1].slice(1) + ')';
+  return m;
 }
 
 function emailReport_() {
   var stats = emailStats_(), subs = rows_('Subscribers');
   var status = {}; subs.forEach(function (s) { status[s.Status] = (status[s.Status] || 0) + 1; });
   var funnel = [1, 2, 3, 4, 5, 6].map(function (n) { return [n === 6 ? 'Next-best email' : 'Lesson ' + n, subs.filter(function (s) { return Number(s['Course step']) >= n; }).length]; });
-  var order = ['lesson-1', 'lesson-2', 'lesson-3', 'lesson-4', 'lesson-5'];
+  var order = ['Lesson 1', 'Lesson 2', 'Lesson 3', 'Lesson 4', 'Lesson 5'];
   var drop = order.filter(function (m) { var x = stats.filter(function (s) { return s.message === m; })[0]; return x && x.rate === 0; })[0];
   var html = '' +
     '<p style="font-size:13px;color:#6B6862">Click rates use unique clicks per subscriber. Open rates are left out because mail privacy features make them unreliable.</p>' +
@@ -1334,7 +1348,7 @@ function coursePostMortem_(force) {
   if (!subs.length) return 'No confirmed subscribers yet';
   if (!force && (finished.length < subs.length || prop_('postmortem_count') === String(finished.length))) return 'Cohort still in the course';
   prop_('postmortem_count', String(finished.length));
-  var stats = emailStats_().filter(function (s) { return /^lesson-|^next-best|^reengage/.test(s.message); });
+  var stats = emailStats_().filter(function (s) { return /^Lesson|^Next-Best|^Re-Engagement/.test(s.message); });
   var topics = {}; subs.forEach(function (s) { var t = s.Interest || 'no clicks'; topics[t] = (topics[t] || 0) + 1; });
   var facts = { cohort_size: subs.length, finished: finished.length, unsubscribed: subs.filter(function (s) { return s.Status === 'unsubscribed'; }).length, sunset: subs.filter(function (s) { return s.Status === 'sunset'; }).length, per_email: stats, top_topics: topics };
   var notes;

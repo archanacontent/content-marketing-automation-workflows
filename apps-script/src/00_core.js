@@ -101,7 +101,7 @@ function verify_(e) {
   return p.s && p.s === sign_(q);
 }
 
-function esc_(s) { return String(s || '').replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+function esc_(s) { return String(s === undefined || s === null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
 
 function fetchJson_(url, opts) {
   var res = UrlFetchApp.fetch(url, Object.assign({ muteHttpExceptions: true }, opts || {}));

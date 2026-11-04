@@ -129,5 +129,6 @@ var WRITING_RULES = [
   'Do not start sentences with This, These or That.',
   'Avoid hype words: unlock, leverage, seamless, game-changer, cutting-edge, robust, elevate, delve, harness, streamline.',
   'Vary sentence length. Keep every sentence under 35 words.',
+  'Write numbers as numerals, never as words.',
   'Never invent numbers, quotes or results. Use only facts given in the input.'
 ].join('\n');

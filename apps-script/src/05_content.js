@@ -195,7 +195,9 @@ function checkPage_(p) {
 function brokenLinks_(pages) {
   var links = {};
   pages.forEach(function (p) {
-    (p.html.match(/href="(https?:[^"#]+|[^"#:]+)"/g) || []).forEach(function (h) {
+    /* Only real links count: preconnect and stylesheet hints point at hosts, not pages. */
+    var body = p.html.replace(/<link\b[^>]*>/gi, '');
+    (body.match(/href="(https?:[^"#]+|[^"#:]+)"/g) || []).forEach(function (h) {
       var u = absolute_(h.slice(6, -1), p.url);
       if (u && /^https/.test(u)) (links[u] = links[u] || []).push(p.url);
     });
