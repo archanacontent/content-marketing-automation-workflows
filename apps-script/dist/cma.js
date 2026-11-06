@@ -254,6 +254,34 @@ var WRITING_RULES = [
   'Never invent numbers, quotes or results. Use only facts given in the input.'
 ].join('\n');
 
+/* Checks a draft against the house rules. Returns a list of problems; empty means clean. */
+var BANNED = ['unlock', 'leverage', 'seamless', 'game-changer', 'cutting-edge', 'robust', 'elevate', 'delve', 'harness', 'streamline', 'comprehensive', 'empower', 'solution', 'solutions', 'solves', 'solve', 'revolutionise', 'transform', 'journey', 'landscape', 'crucial', 'essential'];
+var NUMBER_WORDS = ['two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'eleven', 'twelve', 'twenty', 'thirty', 'forty', 'fifty', 'sixty', 'seventy', 'eighty', 'ninety', 'hundred', 'thousand'];
+function lint_(text, opts) {
+  opts = opts || {};
+  var t = String(text || ''), low = t.toLowerCase(), problems = [];
+  BANNED.forEach(function (w) { if (new RegExp('\\b' + w + '\\b').test(low)) problems.push('uses the banned word "' + w + '"'); });
+  NUMBER_WORDS.forEach(function (w) { if (new RegExp('\\b' + w + '(-|\\b)').test(low)) problems.push('writes a number as a word ("' + w + '")'); });
+  if (/[\u2014;!]/.test(t)) problems.push('uses an em dash, semicolon or exclamation mark');
+  if (/(^|[.?]\s+)(This|These|That|What|Why|How|When)\b/.test(t)) problems.push('starts a sentence with This, These, That, What, Why, How or When');
+  if (opts.author && (t.indexOf(opts.author) >= 0 || /\b(she|her|the author)\b/i.test(t))) problems.push('refers to the author in the third person');
+  return problems;
+}
+
+/* Asks Gemini for JSON, then checks each text field. If any rule is broken, it asks again with the
+   exact problems listed, up to twice. Anything still broken is returned for a person to fix. */
+function geminiChecked_(prompt, fields, opts) {
+  var out = null, problems = [];
+  for (var attempt = 0; attempt < 3; attempt++) {
+    out = gemini_(prompt + (problems.length ? '\n\nYour last draft broke these rules, so rewrite it to fix every one: ' + problems.join('; ') + '.' : ''), { json: true, temperature: 0.5 });
+    problems = [];
+    fields.forEach(function (f) { lint_(out[f], opts).forEach(function (p) { problems.push(f + ' ' + p); }); });
+    if (!problems.length) break;
+  }
+  out._problems = problems;
+  return out;
+}
+
 /* Title Case every word, as the house style requires, whatever the model returned. */
 function titleCase_(t) {
   return String(t || '').replace(/\S+/g, function (w) {
@@ -317,6 +345,7 @@ function safe_(name, fn) {
 }
 
 function runHourly() {
+  if (prop_('claims_building') === 'yes') safe_('Claims register', function () { return checkClaims_(true); });
   safe_('Run tab', processRunTab_);
   safe_('Sign-up confirmations', remindUnconfirmed_);
   safe_('Course', sendCourseDue_);
@@ -780,10 +809,10 @@ function unsubscribe_(id) {
 function broadcastDraft_(item) {
   item = item || promptContent_();
   if (!item) return 'Cancelled';
-  var draft = gemini_(WRITING_RULES + '\n\nWrite a short email (50 to 60 words) telling subscribers of a B2B SaaS launch course about a new piece of work. ' +
-    'Open with one pain-point hook sentence about the reader problem it addresses, then say what they will find. Return JSON with keys subject (Title Case) and body (body as plain paragraphs separated by blank lines).\n\nTitle: ' + item.title + '\nURL: ' + item.url + '\nDescription: ' + item.description, { json: true });
+  var draft = geminiChecked_(WRITING_RULES + '\n\nWrite a short email (50 to 60 words) telling subscribers of a B2B SaaS launch course about a new piece of work. ' +
+    'Open with one pain-point hook sentence about the reader problem it addresses, then say what they will find. Return JSON with keys subject (Title Case) and body (body as plain paragraphs separated by blank lines).\n\nTitle: ' + item.title + '\nURL: ' + item.url + '\nDescription: ' + item.description, ['subject', 'body'], { author: setting_('owner_name') });
   var topic = item.topic || 'none';
-  append_('Queue', { ID: uid_('q'), Created: new Date(), Workflow: 'New content broadcast', Kind: 'broadcast', Target: JSON.stringify({ url: item.url, topic: topic }), Subject: titleCase_(draft.subject), Draft: draft.body, Status: 'awaiting approval', Approved: false });
+  append_('Queue', { ID: uid_('q'), Created: new Date(), Workflow: 'New content broadcast', Kind: 'broadcast', Target: JSON.stringify({ url: item.url, topic: topic }), Subject: titleCase_(draft.subject), Draft: draft.body, Status: draft._problems.length ? 'needs edit: ' + draft._problems.join('; ') : 'awaiting approval', Approved: false });
   formatQueue_();
   notifyOwner_('Broadcast Draft Ready For Approval', 'A broadcast for "' + item.title + '" is waiting in the Queue tab. Edit the subject or draft if needed, then tick Approved to send it.');
   return 'Draft added to the Queue tab';
@@ -986,33 +1015,43 @@ function watchSources_() {
 
 function seedClaims_() { /* The register is built on the first manual run of workflow 2, which reads every guide. */ }
 
+/* Builds the register a few pages at a time. Apps Script stops any run after 6 minutes, so each run
+   works for up to 4 minutes, remembers where it stopped and carries on at the next run. */
 function buildClaims_() {
-  var added = 0;
-  guideRepos_().forEach(function (repo) {
-    crawl_(siteOf_(repo), 6).forEach(function (pg) {
-      var path = pg.url.replace(/^https:\/\/[^/]+/, ''), text = pageText_(pg.html);
-      if (!/(19|20)\d\d|\d+(\.\d+)?\s?%|\bversion\b/i.test(text)) return;
-      var found = [];
-      try {
-        found = gemini_('From the documentation page below, list factual claims that can go out of date: dates, deadlines, statistics, scores, version numbers, regulatory statuses and prices. ' +
-          'Return JSON: an array of objects with keys claim (quote or close paraphrase, under 30 words), source_url (a URL cited near the claim, or empty), cadence_days (how often it should be rechecked: 30, 90 or 365). Return at most 8 items. Only include claims stated in the text.\n\nPAGE: ' + path + '\n\n' + text.slice(0, 12000), { json: true, temperature: 0 });
-      } catch (err) { log_('Claims register', 'extraction failed', path + ': ' + err.message); return; }
-      (found || []).forEach(function (c) {
-        var cadence = Number(c.cadence_days) || 90;
-        append_('Claims', { ID: uid_('c'), Guide: repo, Page: path, Claim: c.claim, 'Source URL': c.source_url || '', 'Last verified': '', 'Recheck by': new Date(Date.now() + days_(Math.min(cadence, 30))), 'Cadence days': cadence, Status: 'needs first check' });
-        added++;
-      });
+  var started = Date.now(), done = JSON.parse(prop_('claims_done') || '[]'), added = 0, finished = true;
+  var pages = [];
+  guideRepos_().forEach(function (repo) { crawl_(siteOf_(repo), 6).forEach(function (pg) { pages.push({ repo: repo, pg: pg }); }); });
+  for (var i = 0; i < pages.length; i++) {
+    var repo = pages[i].repo, pg = pages[i].pg, path = pg.url.replace(/^https:\/\/[^/]+/, '');
+    if (done.indexOf(pg.url) >= 0) continue;
+    if (Date.now() - started > 4 * 60 * 1000) { finished = false; break; }
+    var text = pageText_(pg.html);
+    done.push(pg.url);
+    if (!/(19|20)\d\d|\d+(\.\d+)?\s?%|\bversion\b/i.test(text)) continue;
+    var found = [];
+    try {
+      found = gemini_('From the documentation page below, list factual claims that can go out of date: dates, deadlines, statistics, scores, version numbers, regulatory statuses and prices. ' +
+        'Return JSON: an array of objects with keys claim (quote or close paraphrase, under 30 words), source_url (a URL cited near the claim, or empty), cadence_days (how often it should be rechecked: 30, 90 or 365). Return at most 8 items. Only include claims stated in the text.\n\nPAGE: ' + path + '\n\n' + text.slice(0, 12000), { json: true, temperature: 0 });
+    } catch (err) { log_('Claims register', 'extraction failed', path + ': ' + err.message); continue; }
+    (found || []).forEach(function (c) {
+      var cadence = Number(c.cadence_days) || 90;
+      append_('Claims', { ID: uid_('c'), Guide: repo, Page: path, Claim: c.claim, 'Source URL': c.source_url || '', 'Last verified': '', 'Recheck by': new Date(Date.now() + days_(Math.min(cadence, 30))), 'Cadence days': cadence, Status: 'needs first check' });
+      added++;
     });
-  });
-  return added;
+  }
+  prop_('claims_done', JSON.stringify(finished ? [] : done));
+  prop_('claims_building', finished ? '' : 'yes');
+  return { added: added, finished: finished, left: pages.length - done.length };
 }
 
 function checkClaims_(manual) {
-  if (!rows_('Claims').length) {
-    if (!manual) return 'Register empty';
-    var n = buildClaims_();
-    notifyOwner_('Claims Register Built', n + ' claims were extracted from your guides. Each one needs a first check: confirm it, add the date in Last verified, and the recheck date resets automatically.');
-    return n + ' claims added';
+  if (!rows_('Claims').length || prop_('claims_building') === 'yes') {
+    if (!manual && prop_('claims_building') !== 'yes') return 'Register empty';
+    var r = buildClaims_();
+    if (!r.finished) return r.added + ' claims added so far, ' + r.left + ' pages left. The next run carries on.';
+    var total = rows_('Claims').length;
+    notifyOwner_('Claims Register Built', total + ' claims were extracted from your guides. Each one needs a first check: confirm it, add the date in Last verified, and the recheck date resets automatically.');
+    return total + ' claims in the register';
   }
   var due = [];
   rows_('Claims').forEach(function (c) {
@@ -1168,11 +1207,13 @@ function metadataSuggest_(url) {
 function distributionDrafts_(item) {
   item = item || promptContent_();
   if (!item) return 'Cancelled';
-  var out = gemini_(WRITING_RULES + '\n\nDraft posts that the author of a new piece of work will publish under her own name. Write in the first person singular as the author, never naming her in the third person. ' +
-    'Return JSON with keys linkedin (120 to 180 words, opens with the reader problem, no hashtags, link on its own final line) and reddit_title (under 90 characters, Title Case, a discussion question or observation, no clickbait) and reddit_body (100 to 150 words, written as a discussion starter for practitioners, not promotional, link mentioned once at the end as a resource).\n\n' +
-    'Title: ' + item.title + '\nURL: ' + item.url + '\nDescription: ' + item.description + '\nPage text:\n' + item.text, { json: true });
+  var author = setting_('owner_name');
+  var out = geminiChecked_(WRITING_RULES + '\n\nDraft posts that ' + author + ' will publish under her own name about a piece of work she made. Write in the first person singular (I, my). Never write her name and never refer to her as she, her or the author. ' +
+    'Return JSON with keys linkedin (120 to 180 words, opens with the reader problem, no hashtags, link on its own final line) and reddit_title (under 90 characters, a plain statement of the problem for practitioners to discuss, not a question, no clickbait) and reddit_body (100 to 150 words, a discussion starter for practitioners, not promotional, link mentioned once at the end as a resource).\n\n' +
+    'Title: ' + item.title + '\nURL: ' + item.url + '\nDescription: ' + item.description + '\nPage text:\n' + String(item.text).split(author).join(''), ['linkedin', 'reddit_title', 'reddit_body'], { author: author });
   var draft = 'LINKEDIN\n\n' + out.linkedin + '\n\n---\n\nREDDIT TITLE\n' + titleCase_(out.reddit_title) + '\n\nREDDIT BODY\n' + out.reddit_body;
-  append_('Queue', { ID: uid_('q'), Created: new Date(), Workflow: 'Distribution drafts', Kind: 'social', Target: item.url, Subject: 'Posts For ' + item.title, Draft: draft, Status: 'for review' });
+  var status = out._problems.length ? 'needs edit: ' + out._problems.join('; ') : 'for review';
+  append_('Queue', { ID: uid_('q'), Created: new Date(), Workflow: 'Distribution drafts', Kind: 'social', Target: item.url, Subject: 'Posts For ' + item.title, Draft: draft, Status: status });
   MailApp.sendEmail({ to: setting_('owner_email'), subject: '[Automation] Post Drafts: ' + item.title, htmlBody: frame_('<p>Drafts for your review. Edit them, then post them yourself.</p><pre style="white-space:pre-wrap;font-family:inherit">' + esc_(draft) + '</pre>', { title: 'Post Drafts For Review', label: 'Workflow 5' }), name: 'Content Marketing Automation' });
   return 'Drafts emailed and added to the Queue tab';
 }
@@ -1383,5 +1424,6 @@ globalThis.CMA = {
   onOpen: onOpen, doGet: doGet, doPost: doPost, setup: setup, setGeminiKey: setGeminiKey, refreshed: refreshed,
   runHourly: runHourly, runDaily: runDaily, runWeekly: runWeekly, runNow: runNow, addTestSubscribers: addTestSubscribers
 };
+globalThis.CMA_LINT = lint_;
 
 })();

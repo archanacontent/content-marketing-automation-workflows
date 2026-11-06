@@ -134,6 +134,34 @@ var WRITING_RULES = [
   'Never invent numbers, quotes or results. Use only facts given in the input.'
 ].join('\n');
 
+/* Checks a draft against the house rules. Returns a list of problems; empty means clean. */
+var BANNED = ['unlock', 'leverage', 'seamless', 'game-changer', 'cutting-edge', 'robust', 'elevate', 'delve', 'harness', 'streamline', 'comprehensive', 'empower', 'solution', 'solutions', 'solves', 'solve', 'revolutionise', 'transform', 'journey', 'landscape', 'crucial', 'essential'];
+var NUMBER_WORDS = ['two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'eleven', 'twelve', 'twenty', 'thirty', 'forty', 'fifty', 'sixty', 'seventy', 'eighty', 'ninety', 'hundred', 'thousand'];
+function lint_(text, opts) {
+  opts = opts || {};
+  var t = String(text || ''), low = t.toLowerCase(), problems = [];
+  BANNED.forEach(function (w) { if (new RegExp('\\b' + w + '\\b').test(low)) problems.push('uses the banned word "' + w + '"'); });
+  NUMBER_WORDS.forEach(function (w) { if (new RegExp('\\b' + w + '(-|\\b)').test(low)) problems.push('writes a number as a word ("' + w + '")'); });
+  if (/[\u2014;!]/.test(t)) problems.push('uses an em dash, semicolon or exclamation mark');
+  if (/(^|[.?]\s+)(This|These|That|What|Why|How|When)\b/.test(t)) problems.push('starts a sentence with This, These, That, What, Why, How or When');
+  if (opts.author && (t.indexOf(opts.author) >= 0 || /\b(she|her|the author)\b/i.test(t))) problems.push('refers to the author in the third person');
+  return problems;
+}
+
+/* Asks Gemini for JSON, then checks each text field. If any rule is broken, it asks again with the
+   exact problems listed, up to twice. Anything still broken is returned for a person to fix. */
+function geminiChecked_(prompt, fields, opts) {
+  var out = null, problems = [];
+  for (var attempt = 0; attempt < 3; attempt++) {
+    out = gemini_(prompt + (problems.length ? '\n\nYour last draft broke these rules, so rewrite it to fix every one: ' + problems.join('; ') + '.' : ''), { json: true, temperature: 0.5 });
+    problems = [];
+    fields.forEach(function (f) { lint_(out[f], opts).forEach(function (p) { problems.push(f + ' ' + p); }); });
+    if (!problems.length) break;
+  }
+  out._problems = problems;
+  return out;
+}
+
 /* Title Case every word, as the house style requires, whatever the model returned. */
 function titleCase_(t) {
   return String(t || '').replace(/\S+/g, function (w) {

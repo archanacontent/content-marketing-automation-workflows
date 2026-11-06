@@ -53,6 +53,7 @@ function safe_(name, fn) {
 }
 
 function runHourly() {
+  if (prop_('claims_building') === 'yes') safe_('Claims register', function () { return checkClaims_(true); });
   safe_('Run tab', processRunTab_);
   safe_('Sign-up confirmations', remindUnconfirmed_);
   safe_('Course', sendCourseDue_);

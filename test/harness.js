@@ -240,6 +240,11 @@ assert.strictEqual(sent.filter(m => /Email Performance/.test(m.subject)).length,
 assert.strictEqual(runRows[r11][2], false, 'tick cleared');
 const r4 = runRows.findIndex(r => String(r[0]) === '4'); runRows[r4][2] = true; runRows[r4][3] = 'https://archanacontent.github.io/b2b-saas/'; C.runHourly();
 assert.ok(/Queue/.test(runRows[r4][5]), 'workflow 4 ran with URL input: ' + runRows[r4][5]);
+// Rule check catches the problems found in the real drafts
+const L = globalThis.CMA_LINT;
+const bad = L('Archana Panda created a playbook to solve this. A senior technical writer published a comprehensive nine-module resource.', { author: 'Archana Panda' });
+assert.ok(bad.some(p => /third person/.test(p)) && bad.some(p => /comprehensive/.test(p)) && bad.some(p => /nine/.test(p)) && bad.some(p => /"solve"/.test(p)), 'lint finds real problems: ' + bad);
+assert.strictEqual(L('Launch plans drift when each team writes its own brief. I built a 9-module playbook to keep them aligned.', { author: 'Archana Panda' }).length, 0, 'clean text passes');
 const errors = tabRows('Log').filter(l => l.Event === 'error');
 assert.strictEqual(errors.length, 0, 'no errors: ' + JSON.stringify(errors));
 console.log('ALL TESTS PASSED.', sent.length, 'emails sent in the simulation.');
