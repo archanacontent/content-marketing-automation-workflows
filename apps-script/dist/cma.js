@@ -961,8 +961,8 @@ function seedSources_() {
     ['NVD API version', 'json', 'https://services.nvd.nist.gov/rest/json/cves/2.0?resultsPerPage=1', 'version', 'nvd-cve-api-docs'],
     ['CVE-2026-6584 in the CISA KEV catalog', 'contains', 'https://www.cisa.gov/sites/default/files/feeds/known_exploited_vulnerabilities.json', 'CVE-2026-6584', 'nvd-cve-api-docs'],
     ['openFDA adverse event data last updated', 'json', 'https://api.fda.gov/drug/event.json?limit=1', 'meta.last_updated', 'openfda-drug-safety-guide'],
-    ['Newest Federal Register document on Medicaid community engagement', 'json', 'https://www.federalregister.gov/api/v1/documents.json?conditions%5Bterm%5D=medicaid+community+engagement&order=newest&per_page=1', 'results.0.document_number', 'medicaid-2027-implementation-guide,medically-frail-guide'],
-    ['Newest Federal Register document on Medicaid eligibility redeterminations', 'json', 'https://www.federalregister.gov/api/v1/documents.json?conditions%5Bterm%5D=medicaid+eligibility+renewals&order=newest&per_page=1', 'results.0.document_number', 'medicaid-2027-implementation-guide']
+    ['Newest CMS Medicaid eligibility document on community engagement', 'json', 'https://www.federalregister.gov/api/v1/documents.json?conditions%5Bterm%5D=%22community+engagement%22&conditions%5Bagencies%5D%5B%5D=centers-for-medicare-medicaid-services&conditions%5Bcfr%5D%5Btitle%5D=42&conditions%5Bcfr%5D%5Bpart%5D=435&order=newest&per_page=1', 'results.0.document_number', 'medicaid-2027-implementation-guide,medically-frail-guide'],
+    ['Newest CMS Medicaid eligibility document on renewals', 'json', 'https://www.federalregister.gov/api/v1/documents.json?conditions%5Bterm%5D=renewal&conditions%5Bagencies%5D%5B%5D=centers-for-medicare-medicaid-services&conditions%5Bcfr%5D%5Btitle%5D=42&conditions%5Bcfr%5D%5Bpart%5D=435&order=newest&per_page=1', 'results.0.document_number', 'medicaid-2027-implementation-guide']
   ].forEach(function (s) {
     append_('Sources', { ID: uid_('src'), Name: s[0], Kind: s[1], Target: s[2], Pattern: s[3], 'Guides affected': s[4], Status: 'new' });
   });
@@ -988,7 +988,24 @@ function norm_(v) {
   return /^-?\d+(\.\d+)?$/.test(t) ? String(Number(t)) : t;
 }
 
+/* The first Federal Register watches searched all documents for loose keywords, so unrelated
+   Medicare rules from CMS set them off. They now search only CMS documents that amend Medicaid
+   eligibility rules (42 CFR part 435). Sheets set up with the old queries are updated in place,
+   and their last value is cleared so the switch itself never sends an alert. */
+var SOURCE_FIXES = [
+  { old: 'https://www.federalregister.gov/api/v1/documents.json?conditions%5Bterm%5D=medicaid+community+engagement&order=newest&per_page=1', name: 'Newest CMS Medicaid eligibility document on community engagement', target: 'https://www.federalregister.gov/api/v1/documents.json?conditions%5Bterm%5D=%22community+engagement%22&conditions%5Bagencies%5D%5B%5D=centers-for-medicare-medicaid-services&conditions%5Bcfr%5D%5Btitle%5D=42&conditions%5Bcfr%5D%5Bpart%5D=435&order=newest&per_page=1' },
+  { old: 'https://www.federalregister.gov/api/v1/documents.json?conditions%5Bterm%5D=medicaid+eligibility+renewals&order=newest&per_page=1', name: 'Newest CMS Medicaid eligibility document on renewals', target: 'https://www.federalregister.gov/api/v1/documents.json?conditions%5Bterm%5D=renewal&conditions%5Bagencies%5D%5B%5D=centers-for-medicare-medicaid-services&conditions%5Bcfr%5D%5Btitle%5D=42&conditions%5Bcfr%5D%5Bpart%5D=435&order=newest&per_page=1' }
+];
+function migrateSources_() {
+  rows_('Sources').forEach(function (s) {
+    SOURCE_FIXES.forEach(function (f) {
+      if (s.Target === f.old) update_('Sources', s._row, { Name: f.name, Target: f.target, 'Last value': '', Status: 'updated query' });
+    });
+  });
+}
+
 function watchSources_() {
+  migrateSources_();
   var changes = [];
   rows_('Sources').forEach(function (s) {
     var now;
