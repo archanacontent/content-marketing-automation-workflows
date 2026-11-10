@@ -214,7 +214,7 @@ a{color:inherit}footer a{color:#C9D4FF}
 
 <header class="nav"><div class="wrap">
   <a class="brand" href="https://archanacontent.github.io/">Archana Panda</a>
-  <nav aria-label="Sections"><a href="#how-it-works">How It Works</a><a href="#week">Your Week</a><a href="#workflows">Workflows</a><a href="#examples">Examples</a><a href="#setup">Set It Up</a></nav>
+  <nav aria-label="Sections"><a href="#how-it-works">How It Works</a><a href="#week">Your Week</a><a href="#workflows">Workflows</a><a href="#examples">Examples</a><a href="#n8n">n8n</a><a href="#setup">Set It Up</a></nav>
   <a class="btn" href="%REPO%">View On GitHub</a>
 </div></header>
 
@@ -338,6 +338,22 @@ a{color:inherit}footer a{color:#C9D4FF}
       <div class="panel"><table><tr><th>Test Subscriber</th><th>Strongest Interest</th><th>Next-Best Email</th></tr>%ROWS%</table></div>
       <div class="panel">%SHEET%</div>
     </div>
+  </div>
+</div></section>
+
+<section id="n8n" style="padding-top:0"><div class="wrap">
+  <h2>Example: Live Runs In n8n</h2>
+  <div class="example">
+    <span class="example-tag">Example</span>
+    <p class="sub" style="margin:0 0 20px">Every workflow here also runs in n8n Cloud, imported straight from this repository and connected to the same control sheet, inbox and AI model.</p>
+    <div class="panel"><table>
+      <tr><th>Workflow</th><th>What The Run Did</th><th style="white-space:nowrap">Run Time</th></tr>
+      <tr><td>Source Change Watch</td><td>Checked 6 official sources and recorded no changes</td><td style="white-space:nowrap">13.5 seconds</td></tr>
+      <tr><td>Publishing QA</td><td>Crawled 43 pages across 5 guide sites and found no issues</td><td style="white-space:nowrap">11.8 seconds</td></tr>
+      <tr><td>Enquiry Capture And Follow-Up</td><td>Gemini tagged a test enquiry as a documentation project, the sender got 3 matching samples and the owner got an alert</td><td style="white-space:nowrap">9.2 seconds</td></tr>
+      <tr><td>Email Performance Report</td><td>Read the event log and emailed the click report</td><td style="white-space:nowrap">4.5 seconds</td></tr>
+    </table></div>
+    <p class="note" style="color:var(--mute);font-size:13px;margin-top:12px">All 19 workflows are imported in the same n8n account. These 4 ran in full.</p>
   </div>
 </div></section>
 
