@@ -37,8 +37,11 @@ function ago_(n) { return ymd_(new Date(Date.now() - days_(n))); }
 
 function piece_(path) {
   var seg = String(path || '/').split('/').filter(String)[0] || '';
-  var names = { '': 'Portfolio', 'nvd-cve-api-docs': 'NVD guide', 'medicaid-2027-implementation-guide': 'Medicaid guide', 'medically-frail-guide': 'Medically Frail guide', 'openfda-drug-safety-guide': 'openFDA guide', 'b2b-saas': 'B2B SaaS playbook', 'rfp-response': 'RFP response', asked: 'Asked' };
-  return names[seg] || seg;
+  var names = { '': 'Portfolio', 'nvd-cve-api-docs': 'NVD Guide', 'medicaid-2027-implementation-guide': 'Medicaid Guide', 'medically-frail-guide': 'Medically Frail Guide', 'openfda-drug-safety-guide': 'openFDA Guide', 'b2b-saas': 'B2B SaaS Playbook', 'rfp-response': 'RFP Response', asked: 'Asked', 'content-marketing-automation-workflows': 'Automation Workflows' };
+  if (names[seg]) return names[seg];
+  /* Any other folder becomes a readable name: nasa-firms-api-guide reads as NASA FIRMS API Guide. */
+  var upper = ['nih', 'sbir', 'nasa', 'firms', 'api', 'rfp', 'nvd', 'cve', 'fda', 'ai', 'b2b', 'saas', 'gtm', 'sop', 'eln'];
+  return seg.split(/[-_]/).map(function (w) { return upper.indexOf(w.toLowerCase()) >= 0 ? w.toUpperCase() : w.charAt(0).toUpperCase() + w.slice(1); }).join(' ');
 }
 
 function byPiece_(rows, metric) {
@@ -116,7 +119,7 @@ function label_(m) {
 function emailReport_() {
   var stats = emailStats_(), subs = rows_('Subscribers');
   var status = {}; subs.forEach(function (s) { status[s.Status] = (status[s.Status] || 0) + 1; });
-  var funnel = [1, 2, 3, 4, 5, 6].map(function (n) { return [n === 6 ? 'Next-best email' : 'Lesson ' + n, subs.filter(function (s) { return Number(s['Course step']) >= n; }).length]; });
+  var funnel = [1, 2, 3, 4, 5, 6].map(function (n) { return [n === 6 ? 'Next-Best Email' : 'Lesson ' + n, subs.filter(function (s) { return Number(s['Course step']) >= n; }).length]; });
   var order = ['Lesson 1', 'Lesson 2', 'Lesson 3', 'Lesson 4', 'Lesson 5'];
   var drop = order.filter(function (m) { var x = stats.filter(function (s) { return s.message === m; })[0]; return x && x.rate === 0; })[0];
   var html = '' +

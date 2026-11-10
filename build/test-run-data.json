@@ -1,0 +1,35 @@
+{
+  "subscribers": [
+    {"key": "research", "interest": "research"},
+    {"key": "positioning", "interest": "positioning"},
+    {"key": "launch", "interest": "launch"},
+    {"key": "sales", "interest": "sales"},
+    {"key": "silent", "interest": ""}
+  ],
+  "nvdClaims": 22,
+  "weekly": {
+    "views": {"/": 103, "/nvd-cve-api-docs/": 73, "/nih-sbir-proposal-guide/": 59, "/b2b-saas/": 39, "/medicaid-2027-implementation-guide/": 26, "/openfda-drug-safety-guide/": 25, "/nasa-firms-api-guide/": 23, "/articles/": 10, "/content-marketing-automation-workflows/": 4, "/rfp-response/": 4, "/medically-frail-guide/": 1, "/work/": 1},
+    "previous": {"/": 53, "/nvd-cve-api-docs/": 83, "/b2b-saas/": 16, "/medicaid-2027-implementation-guide/": 12, "/openfda-drug-safety-guide/": 12, "/rfp-response/": 11, "/medically-frail-guide/": 6},
+    "sources": {"(direct)": 205, "github.com": 17, "(not set)": 7, "google": 5, "reddit.com": 4, "bing": 2, "chatgpt.com": 1, "linkedin.com": 1, "teams.public.onecdn.static.microsoft": 1, "yahoo": 1}
+  },
+  "monthly": {
+    "views": {"/": 156, "/nvd-cve-api-docs/": 156, "/nih-sbir-proposal-guide/": 59, "/b2b-saas/": 55, "/medicaid-2027-implementation-guide/": 38, "/openfda-drug-safety-guide/": 37, "/nasa-firms-api-guide/": 23, "/rfp-response/": 15}
+  },
+  "qa": [
+    {"repo": "nvd-cve-api-docs", "sha": "3f2893d", "pages": 6},
+    {"repo": "medicaid-2027-implementation-guide", "sha": "399ab06", "pages": 7},
+    {"repo": "medically-frail-guide", "sha": "9cea002", "pages": 10},
+    {"repo": "openfda-drug-safety-guide", "sha": "7757b75", "pages": 10},
+    {"repo": "b2b-saas", "sha": "bae0d41", "pages": 10}
+  ],
+  "notes": {
+    "weekly": {"measured": ["Portfolio pages gained 103 views this week while reaching the highest traffic volume across all published pieces.", "Direct traffic accounted for 205 sessions among the total tracked visitor sources during the period.", "New signups reached 5 total while new enquiries remained at 0 for the week.", "GitHub traffic generated 17 sessions to place second behind direct visits."], "hypotheses": ["Direct visitors might be returning users bookmarking specific resources.", "GitHub visitors could be finding links inside shared code repositories.", "Search engines might be sending minimal traffic due to indexing delays."]},
+    "email": {"measured": ["Confirmation and lessons 2 through 5 reached a 100 percent click rate.", "Lesson 1 achieved an 80 percent click rate.", "All 4 next-best research, positioning, launch, and sales options recorded 0 percent click rates.", "The re-engagement email achieved a 100 percent click rate."], "hypotheses": ["Perhaps readers preferred core lessons over supplementary next-best choices.", "Maybe the phrasing inside the next-best emails required further refinement.", "Readers could have finished their primary objectives before reaching the final stage."]},
+    "postmortem": {"worked": ["Lesson completion reached 100 percent across 4 consecutive messages following Lesson 1.", "Participant retention remained stable with zero unsubscribes recorded throughout the cohort duration.", "Re-engagement communication secured a click rate of 100 percent from the single recipient."], "underperformed": ["Next-best steps outreach yielded zero clicks across all 5 topic variations sent to individual participants.", "Initial engagement for Lesson 1 recorded the lowest click rate at 80 percent.", "Cohort scale of 5 participants means results remain strictly directional."], "change_next": ["Revise the messaging approach for Lesson 1 to match the higher engagement seen in subsequent lessons.", "Evaluate the utility of next-best steps outreach given the lack of recipient interaction.", "Collect larger sample sizes in future cohorts to validate directional findings."]}
+  },
+  "drafts": {
+    "linkedin": "Misaligned go-to-market teams often deliver conflicting messages to prospective buyers on launch day. Product marketing, sales, and demand generation units typically operate from separate internal plans. Buyers immediately notice the disconnect between the website and the sales deck. A single operational guide now exists to coordinate every department from market research through to the 90-day review. Nine structured modules provide blank templates, completed examples, and warnings regarding common operational errors. Product marketing teams can access the complete framework directly online.\n\nhttps://archanacontent.github.io/b2b-saas/",
+    "reddit_title": "Coordinating Product Marketing And Sales Teams During B2B Software Launches",
+    "reddit_body": "Many software launches suffer because product marketing, sales, and leadership teams operate from separate internal plans. Buyers often encounter conflicting messages between the public website and direct sales conversations. Standardizing the launch process from initial market research to the 90-day review helps align every department. Practitioners facing similar coordination challenges might find useful templates and module outlines within the published guide.\n\nhttps://archanacontent.github.io/b2b-saas/"
+  }
+}

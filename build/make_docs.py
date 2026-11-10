@@ -125,7 +125,7 @@ for gi, gm in enumerate(re.finditer(r"^### (.+?)\n(.*?)(?=^### |\Z)", inside, re
         n = int(num); f = by_no[n]; wf = json.load(open(os.path.join(N8N_DIR, f))); g = GROUP[n]
         rows += f'''<div class="wf">
   <button class="wf-head" aria-expanded="false"><span class="wf-no">{n:02d}</span><span class="wf-name">{esc(name.strip()).replace("-", "\u2011")}</span><span class="wf-problem">{esc(problem.strip())}</span><span class="wf-runs">{esc(runs.strip())}</span><span class="wf-toggle" aria-hidden="true"></span></button>
-  <div class="wf-body" hidden><div class="diagram">{diagram(wf)}</div><div class="wf-links"><a href="{REPO}/blob/main/n8n/{f}">n8n File</a><a href="{REPO}/blob/main/{SRC[g]}">Apps Script Source</a></div></div>
+  <div class="wf-body" hidden><div class="diagram">{diagram(wf)}</div><div class="wf-links"><a href="workflows/{f[3:-5]}/">Open The Full Guide</a><a href="{REPO}/blob/main/n8n/{f}">n8n File</a><a href="{REPO}/blob/main/{SRC[g]}">Apps Script Source</a></div></div>
 </div>'''
     count = len(re.findall(r"^\| \d+ \|", body, re.M))
     sel = "true" if gi == 0 else "false"
@@ -172,3 +172,119 @@ for k, v in fill.items():
 open(os.path.join(ROOT, "docs", "index.html"), "w", encoding="utf-8").write(page)
 left = re.findall(r"%[A-Z_]+%", page)
 print("docs/index.html built", "| unfilled:", left)
+
+# ---------- One page per workflow, built from its n8n file and the approved README row ----------
+CRED_NAMES = {"googleSheetsOAuth2Api": "Google Sheets", "gmailOAuth2": "Gmail", "httpHeaderAuth": "Gemini API key",
+              "googleAnalyticsOAuth2": "Google Analytics", "googleOAuth2Api": "Google Search Console"}
+GAS = {1: ("1", "Daily at 7:00"), 2: ("2", "Weekly, plus 1 January"), 3: ("3", "Daily, after a new commit"), 4: ("4", "On request"), 5: ("5", "On request, or when a new repository appears"),
+       6: (None, "On sign-up"), 7: (None, "On confirmation"), 8: ("8", "Every 10 minutes"), 9: (None, "On every click"), 10: (None, "Every 10 minutes"),
+       11: ("11", "Every 10 minutes"), 12: (None, "On request"), 13: ("13", "On new content"), 14: (None, "Before every send"), 15: ("15", "On enquiry, reminders every 10 minutes"),
+       16: ("16", "Monday at 8:00"), 17: ("17", "Monday at 8:00"), 18: ("18", "1st of the month"), 19: ("19", "Weekly, when a cohort finishes")}
+OUTPUTS = {}  # filled from docs/assets/outputs/<no>-*.png when real outputs are added
+outdir = os.path.join(ROOT, "docs", "assets", "outputs")
+if os.path.isdir(outdir):
+    for fn in sorted(os.listdir(outdir)):
+        if fn[:2].isdigit():
+            OUTPUTS.setdefault(int(fn[:2]), []).append(fn)
+
+tpl = open(os.path.join(ROOT, "build", "docs_template.html"), encoding="utf-8").read()
+STYLE = tpl[tpl.index("<style>"):tpl.index("</style>") + 8]
+WF_CSS = """<style>
+.crumb{font-size:14px;color:var(--mute);margin-bottom:18px}.crumb a{color:var(--mute)}
+.meta-row{display:flex;flex-wrap:wrap;gap:10px;margin-top:22px}
+.pill{border:1px solid var(--line);border-radius:999px;padding:6px 14px;font-size:13.5px;color:var(--ink2)}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:28px}
+.box{border:1px solid var(--line);border-radius:18px;padding:24px;background:var(--soft)}
+.box h3{margin-bottom:12px}
+.steps-list{list-style:none;padding:0;margin:0;counter-reset:s}
+.steps-list li{counter-increment:s;display:grid;grid-template-columns:30px 1fr auto;gap:12px;align-items:center;padding:10px 0;border-top:1px solid var(--line);font-size:14.5px}
+.steps-list li:first-child{border-top:0}
+.steps-list li::before{content:counter(s);width:26px;height:26px;border-radius:8px;background:var(--blue2);color:#fff;font-size:12.5px;font-weight:600;display:grid;place-items:center}
+.steps-list .kd{font-size:12px;color:var(--faint)}
+.tags{display:flex;flex-wrap:wrap;gap:8px}.tags span{border:1px solid var(--line);border-radius:8px;padding:5px 10px;font-size:13.5px}
+.outs{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:14px;margin-top:20px}
+.outs img{width:100%;border-radius:14px;border:1px solid var(--line);display:block}
+.pager{display:flex;justify-content:space-between;gap:12px;margin-top:56px}
+.pager a{flex:1;border:1px solid var(--line);border-radius:14px;padding:16px 18px;text-decoration:none;font-weight:600}
+.pager a span{display:block;font-size:12.5px;color:var(--faint);font-weight:500}
+.pager a.next{text-align:right}
+@media (max-width:760px){.two{grid-template-columns:1fr}}
+</style>"""
+
+all_rows = []
+for gm in re.finditer(r"^### (.+?)\n(.*?)(?=^### |\Z)", inside, re.M | re.S):
+    for num, name, problem, runs in re.findall(r"^\| (\d+) \| ([^|]+) \| ([^|]+) \| ([^|]+) \|$", gm.group(2), re.M):
+        all_rows.append((int(num), name.strip(), problem.strip(), runs.strip(), gm.group(1)))
+
+def slug_of(n):
+    return by_no[n][3:-5]
+
+for idx, (n, name, problem, runs, gname) in enumerate(all_rows):
+    f = by_no[n]; wf = json.load(open(os.path.join(N8N_DIR, f)))
+    nodes = [x for x in wf["nodes"] if x["type"] != "n8n-nodes-base.stickyNote"]
+    order = []
+    names = {x["name"]: x for x in nodes}
+    targets = {t["node"] for c in wf["connections"].values() for t in c["main"][0]}
+    starts = [x["name"] for x in nodes if x["name"] not in targets]
+    seen = set()
+    def walk(nm):
+        if nm in seen: return
+        seen.add(nm); order.append(names[nm])
+        for t in wf["connections"].get(nm, {"main": [[]]})["main"][0]: walk(t["node"])
+    for s0 in starts: walk(s0)
+    steps = "".join(f'<li><span>{esc(x["name"])}</span><span class="kd">{kind(x)[0]}</span></li>' for x in order)
+    tabs_used = sorted({x["parameters"]["sheetName"]["value"] for x in nodes if x["type"].endswith("googleSheets")})
+    creds = sorted({CRED_NAMES.get(k, k) for x in nodes for k in x.get("credentials", {})})
+    gas_no, gas_when = GAS[n]
+    raw = f"https://raw.githubusercontent.com/archanacontent/content-marketing-automation-workflows/main/n8n/{f}"
+    outs = OUTPUTS.get(n, [])
+    out_html = ("<section style=\"padding-top:0\"><div class=\"wrap\"><h2>Real Output</h2><div class=\"outs\">" +
+                "".join(f'<img src="../../assets/outputs/{o}" alt="Output from {esc(name)}, page {i + 1}" loading="lazy">' for i, o in enumerate(outs)) +
+                "</div></div></section>") if outs else ""
+    prev = all_rows[idx - 1] if idx else None
+    nxt = all_rows[idx + 1] if idx + 1 < len(all_rows) else None
+    pager = '<div class="pager">' + (f'<a href="../{slug_of(prev[0])}/"><span>Previous</span>{esc(prev[1])}</a>' if prev else "<span></span>") + \
+            (f'<a class="next" href="../{slug_of(nxt[0])}/"><span>Next</span>{esc(nxt[1])}</a>' if nxt else "") + "</div>"
+    page = f"""<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>{esc(name)} | Content Marketing Automation Workflows</title>
+<meta name="description" content="{esc(problem)}">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-R5QPB9VQWB"></script><script>window.dataLayer=window.dataLayer||[];function gtag(){{dataLayer.push(arguments);}}gtag('js',new Date());gtag('config','G-R5QPB9VQWB');</script>
+{STYLE}{WF_CSS}</head><body>
+<header class="nav"><div class="wrap"><a class="brand" href="../../">Content Marketing Automation Workflows</a><a class="btn" href="{REPO}">View On GitHub</a></div></header>
+<div class="hero"><div class="wrap">
+<p class="crumb"><a href="../../#workflows">Workflows</a> / {esc(gname)}</p>
+<h1 style="max-width:20ch;font-size:clamp(34px,5vw,56px)">{esc(name)}</h1>
+<p class="sub">{esc(problem)}</p>
+<div class="meta-row"><span class="pill">{esc(runs)}</span>{"".join(f'<span class="pill">{esc(c)}</span>' for c in creds)}</div>
+</div></div>
+<section style="padding-top:0"><div class="wrap">
+<h2>How It Runs</h2>
+<div class="diagram" style="margin-top:24px">{diagram(wf)}</div>
+<div class="two">
+<div class="box"><h3>Steps</h3><ol class="steps-list">{steps}</ol></div>
+<div class="box"><h3>Control Sheet Tabs</h3><div class="tags">{"".join(f"<span>{esc(t)}</span>" for t in tabs_used) or "<span>None</span>"}</div>
+<h3 style="margin-top:22px">Accounts To Connect</h3><div class="tags">{"".join(f"<span>{esc(c)}</span>" for c in creds) or "<span>None</span>"}</div></div>
+</div></div></section>
+<section style="padding-top:0"><div class="wrap">
+<h2>Run It Yourself</h2>
+<div class="two">
+<div class="box"><h3>n8n</h3><ol class="steps-list">
+<li><span>In n8n, open <b>Workflows</b>, then <b>Import from URL</b></span><span></span></li>
+<li><span>Paste <code style="word-break:break-all">{raw}</code></span><span></span></li>
+<li><span>Fill in the Config node and connect the accounts listed above</span><span></span></li>
+<li><span>Activate the workflow</span><span></span></li></ol>
+<div class="wf-links"><a href="{REPO}/blob/main/n8n/{f}">View The n8n File</a></div></div>
+<div class="box"><h3>Google Apps Script</h3><ol class="steps-list">
+<li><span>Set up the control sheet with the steps on the main page</span><span></span></li>
+<li><span>Runs on its own: {esc(gas_when)}</span><span></span></li>
+{f'<li><span>To run it now, open the Run tab and tick <b>Run now</b> next to No. <b>{gas_no}</b></span><span></span></li>' if gas_no else ''}
+</ol><div class="wf-links"><a href="{REPO}/blob/main/{SRC[GROUP[n]]}">View The Apps Script Source</a></div></div>
+</div></div></section>
+{out_html}
+<section style="padding-top:0"><div class="wrap">{pager}</div></section>
+<footer><div class="wrap">MIT licence. Created by <a href="https://archanacontent.github.io/">Archana Panda</a>.</div></footer>
+</body></html>"""
+    d = os.path.join(ROOT, "docs", "workflows", slug_of(n)); os.makedirs(d, exist_ok=True)
+    open(os.path.join(d, "index.html"), "w", encoding="utf-8").write(page)
+print("built", len(all_rows), "workflow pages")

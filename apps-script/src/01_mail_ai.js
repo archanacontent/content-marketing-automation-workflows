@@ -155,11 +155,18 @@ function geminiChecked_(prompt, fields, opts) {
   for (var attempt = 0; attempt < 3; attempt++) {
     out = gemini_(prompt + (problems.length ? '\n\nYour last draft broke these rules, so rewrite it to fix every one: ' + problems.join('; ') + '.' : ''), { json: true, temperature: 0.5 });
     problems = [];
+    fields.forEach(function (f) { out[f] = numerals_(out[f]); });
     fields.forEach(function (f) { lint_(out[f], opts).forEach(function (p) { problems.push(f + ' ' + p); }); });
     if (!problems.length) break;
   }
   out._problems = problems;
   return out;
+}
+
+/* Replaces number words with numerals, as the house style requires. */
+function numerals_(t) {
+  var map = { two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10, eleven: 11, twelve: 12, twenty: 20, thirty: 30, forty: 40, fifty: 50, sixty: 60, seventy: 70, eighty: 80, ninety: 90 };
+  return String(t || '').replace(/\b(two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety)\b/gi, function (w) { return String(map[w.toLowerCase()]); });
 }
 
 /* Title Case every word, as the house style requires, whatever the model returned. */
