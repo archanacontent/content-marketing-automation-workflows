@@ -352,13 +352,15 @@ function safe_(name, fn) {
 }
 
 function runHourly() {
-  if (prop_('claims_building') === 'yes') safe_('Claims register', function () { return checkClaims_(true); });
+  CLAIMS_RAN = false;
   safe_('Run tab', processRunTab_);
   safe_('Sign-up confirmations', remindUnconfirmed_);
   safe_('Course', sendCourseDue_);
   safe_('Re-engagement and sunset', reengage_);
   safe_('Enquiry reminders', remindEnquiries_);
   safe_('Approved queue', sendApproved_);
+  /* The claims build runs last, so a long build never holds up emails, and only once per run. */
+  if (prop_('claims_building') === 'yes' && !CLAIMS_RAN) safe_('Claims register', continueClaims_);
 }
 
 function runDaily() {
@@ -422,6 +424,13 @@ function fillRunTab_() {
   var sh = tab_('Run');
   sh.getRange(2, TABS.Run.indexOf('Run now') + 1, Math.max(sh.getLastRow() - 1, 1), 1).insertCheckboxes();
   sh.setColumnWidth(2, 320);
+}
+
+/* Carries on a claims build and shows its progress in the Run tab row for workflow 2. */
+function continueClaims_() {
+  var out = checkClaims_(true);
+  rows_('Run').forEach(function (r) { if (String(r['No.']) === '2') update_('Run', r._row, { 'Last run': new Date(), Result: String(out).slice(0, 500) }); });
+  log_('Claims register', 'build continued', out);
 }
 
 function processRunTab_() {
@@ -1040,19 +1049,31 @@ function watchSources_() {
 function seedClaims_() { /* The register is built on the first manual run of workflow 2, which reads every guide. */ }
 
 /* Builds the register a few pages at a time. Apps Script stops any run after 6 minutes, so each run
-   works for up to 4 minutes, remembers where it stopped and carries on at the next run. */
+   starts new pages for up to 2.5 minutes, saves its place after every page and carries on at the next run.
+   CLAIMS_RAN stops a second build in the same run, which would push the run past the limit. */
+var CLAIMS_RAN = false;
 function buildClaims_() {
+  CLAIMS_RAN = true;
   var started = Date.now(), done = JSON.parse(prop_('claims_done') || '[]'), added = 0, finished = true;
+  var late = function () { return Date.now() - started > 150 * 1000; };
   /* Pages already in the register are skipped, so an earlier partial build is never duplicated. */
-  rows_('Claims').forEach(function (c) { done.push(siteOf_(c.Guide).match(/^https?:\/\/[^/]+/)[0] + c.Page); });
+  rows_('Claims').forEach(function (c) {
+    var u = siteOf_(c.Guide).match(/^https?:\/\/[^/]+/)[0] + c.Page;
+    if (done.indexOf(u) < 0) done.push(u);
+  });
   var pages = [];
-  guideRepos_().forEach(function (repo) { crawl_(siteOf_(repo), 6).forEach(function (pg) { pages.push({ repo: repo, pg: pg }); }); });
+  var repos = guideRepos_();
+  for (var g = 0; g < repos.length; g++) {
+    if (late()) { finished = false; break; }
+    crawl_(siteOf_(repos[g]), 6).forEach(function (pg) { pages.push({ repo: repos[g], pg: pg }); });
+  }
   for (var i = 0; i < pages.length; i++) {
     var repo = pages[i].repo, pg = pages[i].pg, path = pg.url.replace(/^https:\/\/[^/]+/, '');
     if (done.indexOf(pg.url) >= 0) continue;
-    if (Date.now() - started > 4 * 60 * 1000) { finished = false; break; }
+    if (late()) { finished = false; break; }
     var text = pageText_(pg.html);
     done.push(pg.url);
+    prop_('claims_done', JSON.stringify(done));
     if (!/(19|20)\d\d|\d+(\.\d+)?\s?%|\bversion\b/i.test(text)) continue;
     var found = [];
     try {
@@ -1067,7 +1088,8 @@ function buildClaims_() {
   }
   prop_('claims_done', JSON.stringify(finished ? [] : done));
   prop_('claims_building', finished ? '' : 'yes');
-  return { added: added, finished: finished, left: pages.length - done.length };
+  var left = pages.filter(function (p) { return done.indexOf(p.pg.url) < 0; }).length;
+  return { added: added, finished: finished, left: finished ? 0 : left };
 }
 
 function checkClaims_(manual) {

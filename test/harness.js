@@ -218,6 +218,13 @@ assert.ok(sent.some(m => /Weekly Performance/.test(m.subject)) && sent.some(m =>
 // Manual runs through the menu prompt: claims register and monthly health
 global.__prompt = '2'; C.runNow();
 assert.ok(tabRows('Claims').length > 0, 'claims extracted');
+// A build left unfinished carries on in the 10-minute run, without duplicates, and reports in the Run tab
+const claimsBefore = tabRows('Claims').length;
+props.claims_building = 'yes'; props.claims_done = '[]';
+C.runHourly();
+assert.strictEqual(tabRows('Claims').length, claimsBefore, 'no duplicate claims');
+assert.ok(!props.claims_building, 'build marked finished');
+assert.ok(/claims in the register/.test(tabRows('Run').find(r => String(r['No.']) === '2').Result), 'Run tab shows claims result');
 global.__prompt = '18'; C.runNow();
 assert.ok(sent.some(m => /Monthly Content Health/.test(m.subject)), 'health check sent');
 

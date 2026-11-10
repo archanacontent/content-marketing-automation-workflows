@@ -53,13 +53,15 @@ function safe_(name, fn) {
 }
 
 function runHourly() {
-  if (prop_('claims_building') === 'yes') safe_('Claims register', function () { return checkClaims_(true); });
+  CLAIMS_RAN = false;
   safe_('Run tab', processRunTab_);
   safe_('Sign-up confirmations', remindUnconfirmed_);
   safe_('Course', sendCourseDue_);
   safe_('Re-engagement and sunset', reengage_);
   safe_('Enquiry reminders', remindEnquiries_);
   safe_('Approved queue', sendApproved_);
+  /* The claims build runs last, so a long build never holds up emails, and only once per run. */
+  if (prop_('claims_building') === 'yes' && !CLAIMS_RAN) safe_('Claims register', continueClaims_);
 }
 
 function runDaily() {
@@ -123,6 +125,13 @@ function fillRunTab_() {
   var sh = tab_('Run');
   sh.getRange(2, TABS.Run.indexOf('Run now') + 1, Math.max(sh.getLastRow() - 1, 1), 1).insertCheckboxes();
   sh.setColumnWidth(2, 320);
+}
+
+/* Carries on a claims build and shows its progress in the Run tab row for workflow 2. */
+function continueClaims_() {
+  var out = checkClaims_(true);
+  rows_('Run').forEach(function (r) { if (String(r['No.']) === '2') update_('Run', r._row, { 'Last run': new Date(), Result: String(out).slice(0, 500) }); });
+  log_('Claims register', 'build continued', out);
 }
 
 function processRunTab_() {
