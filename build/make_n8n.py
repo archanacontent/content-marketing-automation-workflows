@@ -192,28 +192,50 @@ w.save("claims-register-annual-versioning")
 w = WF("Publishing QA", 3)
 w.note("## Publishing QA\nChecks each guide site after a new commit: titles, meta descriptions, one H1, heading order, alt text and broken links. Commit changes come from GitHub's public Atom feed, which avoids the API rate limit.")
 c = start(w, schedule("hours", hoursInterval=6) + ("Every 6 Hours",))
-k = w.node("Crawl And Check", *code("""const cfg = $('Config').first().json, store = $getWorkflowStaticData('global'), report = [];
-const abs = (h, b) => { try { return new URL(h, b).href.split('#')[0]; } catch (e) { return null; } };
-for (const site of cfg.guideSites) {
+k = w.node("Crawl And Check", *code("""const cfg = $('Config').first().json, store = $getWorkflowStaticData('global');
+/* n8n stops a Code node after 60 seconds, so sites, pages and links are fetched in parallel batches. */
+const get = (url) => this.helpers.httpRequest({ url, timeout: 8000, returnFullResponse: true, ignoreHttpStatusErrors: true })
+  .then(r => ({ code: r.statusCode, body: String(r.body) }), () => ({ code: 0, body: '' }));
+const batch = async (items, n, fn) => { const out = []; for (let i = 0; i < items.length; i += n) out.push(...await Promise.all(items.slice(i, i + n).map(fn))); return out; };
+const abs = (h, b) => {
+  h = h.split('#')[0]; if (!h || /^(mailto:|tel:|javascript:)/.test(h)) return null;
+  if (/^https?:\\/\\//.test(h)) return h;
+  const origin = b.match(/^https?:\\/\\/[^/]+/)[0];
+  const parts = (h.startsWith('/') ? h : b.replace(origin, '').replace(/[^/]*$/, '') + h).split('/'), out = [];
+  parts.forEach(p => { if (p === '..') out.pop(); else if (p !== '.') out.push(p); });
+  return origin + out.join('/').replace(/^([^/])/, '/$1');
+};
+const checkSite = async (site) => {
   const repo = site.split('/').filter(Boolean).pop();
-  const feed = await this.helpers.httpRequest({ url: 'https://github.com/' + cfg.githubOwner + '/' + repo + '/commits.atom' });
-  const sha = (String(feed).match(/Commit\\/([0-9a-f]{7,40})/) || [])[1];
-  if (sha && store[repo] === sha) continue; store[repo] = sha;
-  const seen = new Set(), queue = [site], pages = [];
-  while (queue.length && pages.length < 40) { const u = queue.shift(); if (seen.has(u)) continue; seen.add(u);
-    let h; try { h = await this.helpers.httpRequest({ url: u }); } catch (e) { continue; } pages.push({ u, h: String(h) });
-    for (const m of String(h).matchAll(/href="([^"#]+)"/g)) { const x = abs(m[1], u); if (x && x.startsWith(site) && !/\\.(pdf|docx|xlsx|pptx|png|jpg|svg|css|js|xml)$/i.test(x)) queue.push(x); } }
+  const feed = await get('https://github.com/' + cfg.githubOwner + '/' + repo + '/commits.atom');
+  const sha = (feed.body.match(/Commit\\/([0-9a-f]{7,40})/) || [])[1];
+  if (sha && store[repo] === sha) return null;
+  const seen = new Set([site]), pages = [];
+  let frontier = [site];
+  while (frontier.length && pages.length < 40) {
+    const got = await batch(frontier.slice(0, 40 - pages.length), 10, async u => ({ u, ...(await get(u)) }));
+    frontier = [];
+    for (const g of got) {
+      if (g.code !== 200 || !/<html[\\s>]/i.test(g.body)) continue; pages.push({ u: g.u, h: g.body });
+      for (const m of g.body.matchAll(/href="([^"#]+)"/g)) { const x = abs(m[1], g.u);
+        if (x && x.startsWith(site) && !seen.has(x) && !/\\.(pdf|docx|xlsx|pptx|png|jpe?g|gif|webp|svg|ico|css|js|json|xml|zip|woff2?|ttf)$/i.test(x.split('?')[0])) { seen.add(x); frontier.push(x); } }
+    }
+  }
   const issues = [];
   for (const p of pages) { const h = p.h, i = []; if (/<meta name="robots" content="[^"]*noindex/i.test(h)) continue;
     if (!/<title>[^<]{5,}<\\/title>/i.test(h)) i.push('Missing title');
-    const d = (h.match(/<meta name="description" content="([^"]*)"/i) || [])[1]; if (!d) i.push('Missing meta description'); else if (d.length > 160) i.push('Meta description over 160 characters');
+    const d = (h.match(/<meta name="description" content="([^"]*)"/i) || [])[1]; if (!d) i.push('Missing meta description'); else if (d.replace(/&#?\\w+;/g, ' ').length > 160) i.push('Meta description over 160 characters');
     const h1 = (h.match(/<h1[\\s>]/gi) || []).length; if (h1 !== 1) i.push(h1 + ' H1 headings');
     const lv = (h.match(/<h([1-6])[\\s>]/gi) || []).map(t => +t[2]); for (let j = 1; j < lv.length; j++) if (lv[j] - lv[j - 1] > 1) { i.push('Heading level skipped'); break; }
     const na = (h.match(/<img(?![^>]*\\balt=)[^>]*>/gi) || []).length; if (na) i.push(na + ' image(s) without alt text');
     if (i.length) issues.push(p.u.replace(/^https:\\/\\/[^/]+/, '') + ': ' + i.join('; ')); }
   const links = new Set(); pages.forEach(p => { for (const m of p.h.replace(/<link\\b[^>]*>/gi, '').matchAll(/href="(https:[^"#]+)"/g)) links.add(m[1]); });
-  for (const l of [...links].slice(0, 120)) { try { await this.helpers.httpRequest({ url: l, method: 'GET' }); } catch (e) { const code = e.httpCode || (e.response && e.response.status); if (code == 404 || code == 410 || code >= 500) issues.push('Broken link (' + code + '): ' + l); } }
-  report.push({ repo, pages: pages.length, issues, sha: (sha || '').slice(0, 7) }); }
+  const res = await batch([...links].slice(0, 80), 15, async l => ({ l, code: (await get(l)).code }));
+  res.forEach(r => { if (r.code === 404 || r.code === 410 || r.code >= 500) issues.push('Broken link (' + r.code + '): ' + r.l); });
+  return { repo, pages: pages.length, issues, sha: (sha || '').slice(0, 7), _sha: sha };
+};
+const report = (await Promise.all(cfg.guideSites.map(checkSite))).filter(Boolean);
+report.forEach(r => { store[r.repo] = r._sha; delete r._sha; });
 return report.length ? [{ json: { report } }] : [];"""), after=c)
 e = w.node("Build Report", *code("const cfg = $('Config').first().json;\n" + TEMPLATE + """
 const html = $json.report.map(r => '<p><b>' + r.repo + '</b> (' + r.sha + '): ' + r.pages + ' pages' + (r.issues.length ? '' : ', no issues.') + '</p>' + (r.issues.length ? '<ul>' + r.issues.map(i => '<li>' + i + '</li>').join('') + '</ul>' : '')).join('');

@@ -1043,6 +1043,8 @@ function seedClaims_() { /* The register is built on the first manual run of wor
    works for up to 4 minutes, remembers where it stopped and carries on at the next run. */
 function buildClaims_() {
   var started = Date.now(), done = JSON.parse(prop_('claims_done') || '[]'), added = 0, finished = true;
+  /* Pages already in the register are skipped, so an earlier partial build is never duplicated. */
+  rows_('Claims').forEach(function (c) { done.push(siteOf_(c.Guide).match(/^https?:\/\/[^/]+/)[0] + c.Page); });
   var pages = [];
   guideRepos_().forEach(function (repo) { crawl_(siteOf_(repo), 6).forEach(function (pg) { pages.push({ repo: repo, pg: pg }); }); });
   for (var i = 0; i < pages.length; i++) {
@@ -1069,8 +1071,11 @@ function buildClaims_() {
 }
 
 function checkClaims_(manual) {
-  if (!rows_('Claims').length || prop_('claims_building') === 'yes') {
+  var have = rows_('Claims').map(function (c) { return c.Guide; });
+  var missing = guideRepos_().filter(function (g) { return have.indexOf(g) < 0; });
+  if (!have.length || prop_('claims_building') === 'yes' || (manual && missing.length)) {
     if (!manual && prop_('claims_building') !== 'yes') return 'Register empty';
+    if (manual) prop_('claims_building', 'yes');
     var r = buildClaims_();
     if (!r.finished) return r.added + ' claims added so far, ' + r.left + ' pages left. The next run carries on.';
     var total = rows_('Claims').length;
