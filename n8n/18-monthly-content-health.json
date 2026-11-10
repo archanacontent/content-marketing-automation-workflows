@@ -126,7 +126,8 @@
           "id": "",
           "name": "googleOAuth2Api"
         }
-      }
+      },
+      "onError": "continueRegularOutput"
     },
     {
       "parameters": {

@@ -42,6 +42,8 @@ class WF:
              "type": type_, "typeVersion": version, "position": [x if x is not None else self.x, y]}
         if creds:
             n["credentials"] = {creds: {"id": "", "name": creds}}
+        if name == "Search Console":
+            n["onError"] = "continueRegularOutput"  # reports still send if Search Console is not connected
         self.nodes.append(n)
         if x is None:
             self.x += 240
